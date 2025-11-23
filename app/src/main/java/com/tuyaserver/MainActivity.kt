@@ -297,8 +297,9 @@ class MainActivity : AppCompatActivity() {
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.doOutput = true
-                connection.connectTimeout = 5000
-                connection.readTimeout = 10000
+                // Timeouts aumentados: comando Tuya pode demorar (3 tentativas UDP)
+                connection.connectTimeout = 10000 // 10 segundos para conectar
+                connection.readTimeout = 20000 // 20 segundos para ler resposta
                 
                 val json = """
                     {
@@ -335,17 +336,30 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: java.net.SocketTimeoutException) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "⏱️ Timeout ao conectar ao servidor", Toast.LENGTH_LONG).show()
+                    val errorMsg = if (e.message?.contains("connect") == true) {
+                        "⏱️ Timeout ao conectar ao servidor. Verifique se o servidor está rodando."
+                    } else {
+                        "⏱️ Timeout ao receber resposta do servidor. O comando pode ter sido enviado."
+                    }
+                    Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
+                    android.util.Log.e("MainActivity", "Timeout ao enviar comando Tuya", e)
+                }
+            } catch (e: java.net.ConnectException) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "❌ Não foi possível conectar ao servidor. Verifique se está rodando.", Toast.LENGTH_LONG).show()
+                    android.util.Log.e("MainActivity", "Erro de conexão ao enviar comando Tuya", e)
                 }
             } catch (e: java.net.UnknownHostException) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "❌ Não foi possível conectar ao servidor", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "❌ IP não encontrado: $localIp", Toast.LENGTH_LONG).show()
+                    android.util.Log.e("MainActivity", "IP não encontrado", e)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     val errorMsg = e.message ?: "Erro desconhecido"
                     Toast.makeText(this@MainActivity, "❌ Erro: $errorMsg", Toast.LENGTH_LONG).show()
                     android.util.Log.e("MainActivity", "Erro ao enviar comando Tuya", e)
+                    e.printStackTrace()
                 }
             }
         }

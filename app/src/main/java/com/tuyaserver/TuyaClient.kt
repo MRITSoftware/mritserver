@@ -19,7 +19,7 @@ class TuyaClient {
         private const val TAG = "TuyaClient"
         private const val DEFAULT_PROTOCOL_VERSION = 3.4 // Padrão 3.4
         private const val PORT = 6668
-        private const val TIMEOUT_MS = 5000
+        private const val TIMEOUT_MS = 3000 // Reduzido para 3s para acelerar o processo
     }
     
     /**
@@ -70,11 +70,12 @@ class TuyaClient {
             log("[DEBUG] Payload total: ${payload.size} bytes")
             log("[DEBUG] Hex do payload completo: ${payload.joinToString(" ") { "%02X".format(it) }}")
             
-            // Tenta enviar múltiplas vezes (3 tentativas) para garantir que o comando chegue
+            // Tenta enviar múltiplas vezes (2 tentativas) para garantir que o comando chegue
+            // Reduzido para 2 tentativas para evitar timeout no cliente HTTP
             var lastResponse: ByteArray? = null
             var success = false
-            for (attempt in 1..3) {
-                log("[INFO] Tentativa $attempt de 3")
+            for (attempt in 1..2) {
+                log("[INFO] Tentativa $attempt de 2")
                 val response = sendUdpPacket(lanIp, PORT, payload)
                 lastResponse = response
                 
@@ -92,8 +93,8 @@ class TuyaClient {
                 }
                 
                 // Aguarda um pouco entre tentativas (exceto na última)
-                if (attempt < 3) {
-                    kotlinx.coroutines.delay(200) // 200ms entre tentativas
+                if (attempt < 2) {
+                    kotlinx.coroutines.delay(100) // 100ms entre tentativas (reduzido)
                 }
             }
             
