@@ -320,6 +320,14 @@ class TuyaClient(private val context: Context? = null) {
             log("[UDP] Endereço resolvido: ${address.hostAddress}")
             log("[UDP] Socket local: ${socket.localAddress?.hostAddress}:${socket.localPort}")
             
+            // Verifica se o IP é válido e está na mesma rede
+            if (address.isLoopbackAddress) {
+                log("[UDP] ⚠️ AVISO: IP é loopback (127.0.0.1) - não vai funcionar!")
+            }
+            if (address.isMulticastAddress) {
+                log("[UDP] ⚠️ AVISO: IP é multicast - não vai funcionar!")
+            }
+            
             val packet = DatagramPacket(data, data.size, address, port)
             log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
             log("[UDP] Primeiros 32 bytes do pacote: ${data.take(32).joinToString(" ") { "%02X".format(it) }}")
