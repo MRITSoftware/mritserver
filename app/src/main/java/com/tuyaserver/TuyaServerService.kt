@@ -286,22 +286,34 @@ class TuyaServerService : Service() {
     private fun testLocalConnection() {
         serviceScope.launch(Dispatchers.IO) {
             try {
-                kotlinx.coroutines.delay(3000) // Aguarda mais um pouco
+                kotlinx.coroutines.delay(5000) // Aguarda o servidor iniciar completamente
+                Log.d(TAG, "[TEST] Iniciando teste de conexão local...")
+                
                 val url = java.net.URL("http://127.0.0.1:$PORT/health")
                 val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.connectTimeout = 2000
-                connection.readTimeout = 2000
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
                 connection.requestMethod = "GET"
                 
+                Log.d(TAG, "[TEST] Tentando conectar em http://127.0.0.1:$PORT/health...")
                 val responseCode = connection.responseCode
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                
                 if (responseCode == 200) {
                     Log.d(TAG, "[TEST] ✅ Teste local bem-sucedido! Servidor respondendo na porta $PORT")
+                    Log.d(TAG, "[TEST] Resposta: $response")
                 } else {
                     Log.w(TAG, "[TEST] ⚠️ Teste local retornou código: $responseCode")
+                    Log.w(TAG, "[TEST] Resposta: $response")
                 }
                 connection.disconnect()
+            } catch (e: java.net.ConnectException) {
+                Log.e(TAG, "[TEST] ❌ Não foi possível conectar (servidor pode não estar escutando): ${e.message}")
+            } catch (e: java.net.SocketTimeoutException) {
+                Log.e(TAG, "[TEST] ❌ Timeout ao conectar (servidor não respondeu): ${e.message}")
             } catch (e: Exception) {
                 Log.e(TAG, "[TEST] ❌ Teste local falhou: ${e.message}", e)
+                e.printStackTrace()
             }
         }
     }
