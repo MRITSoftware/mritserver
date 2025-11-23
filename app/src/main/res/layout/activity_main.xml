@@ -52,7 +52,46 @@
             android:text="Servidor: Parado"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="#E53935" />
+            android:textColor="#E53935"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp"
+            android:background="#F5F5F5"
+            android:clickable="true"
+            android:focusable="true"
+            android:id="@+id/ipContainer">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="IP Local:"
+                android:textSize="14sp"
+                android:textColor="#666666" />
+            
+            <TextView
+                android:id="@+id/ipText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="192.168.1.xxx"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:fontFamily="monospace"
+                android:padding="4dp" />
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📋"
+                android:textSize="16sp"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Buttons -->
