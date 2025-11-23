@@ -120,6 +120,14 @@ class TuyaServerService : Service() {
                 Log.d(TAG, "Host: 0.0.0.0 (aceita conexões de qualquer interface)")
                 
                 server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
+                    environment.monitor.subscribe(ApplicationStarted) {
+                        Log.d(TAG, "[SERVER] Servidor HTTP iniciado e escutando na porta $PORT")
+                    }
+                    
+                    environment.monitor.subscribe(ApplicationStopped) {
+                        Log.d(TAG, "[SERVER] Servidor HTTP parado")
+                    }
+                    
                     install(ContentNegotiation) {
                         json(Json {
                             prettyPrint = true
@@ -130,12 +138,20 @@ class TuyaServerService : Service() {
                     
                     routing {
                         get("/health") {
-                            Log.d(TAG, "[HTTP] GET /health recebido")
-                            call.respond(
-                                HttpStatusCode.OK,
-                                HealthResponse(status = "ok", site = getSiteName())
-                            )
-                            Log.d(TAG, "[HTTP] GET /health respondido com sucesso")
+                            Log.d(TAG, "[HTTP] GET /health recebido de ${call.request.remoteHost}")
+                            try {
+                                val response = HealthResponse(status = "ok", site = getSiteName())
+                                call.respond(HttpStatusCode.OK, response)
+                                Log.d(TAG, "[HTTP] GET /health respondido com sucesso")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "[HTTP] Erro ao responder /health", e)
+                                call.respond(HttpStatusCode.InternalServerError, "Erro interno")
+                            }
+                        }
+                        
+                        get("/") {
+                            Log.d(TAG, "[HTTP] GET / recebido")
+                            call.respond(HttpStatusCode.OK, "MRIT Server está rodando!")
                         }
                         
                         post("/tuya/command") {
@@ -205,7 +221,25 @@ class TuyaServerService : Service() {
                             }
                         }
                     }
-                }.start(wait = false)
+                }
+                
+                Log.d(TAG, "[START] Iniciando servidor Netty...")
+                server?.start(wait = false)
+                
+                // Aguarda um pouco para o servidor iniciar
+                kotlinx.coroutines.delay(1000)
+                
+                // Verifica se o servidor está rodando
+                val isRunning = server?.resolvedConnectors()?.isNotEmpty() == true
+                if (isRunning) {
+                    val connectors = server?.resolvedConnectors() ?: emptyList()
+                    connectors.forEach { connector ->
+                        Log.d(TAG, "[START] Servidor escutando em: ${connector.type}://${connector.host}:${connector.port}")
+                    }
+                    Log.d(TAG, "[START] ✅ Servidor MRIT rodando! (SITE=${getSiteName()})")
+                } else {
+                    Log.w(TAG, "[START] ⚠️ Servidor iniciado mas não confirmou escuta na porta")
+                }
                 
                 Log.d(TAG, "[START] Servidor MRIT local rodando em http://0.0.0.0:$PORT (SITE=${getSiteName()})")
                 
