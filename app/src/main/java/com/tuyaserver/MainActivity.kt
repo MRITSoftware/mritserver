@@ -461,9 +461,9 @@ class MainActivity : AppCompatActivity() {
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.doOutput = true
-                // Timeouts aumentados: comando Tuya pode demorar (3 tentativas UDP)
+                // Timeouts aumentados: comando Tuya pode demorar (múltiplas tentativas UDP)
                 connection.connectTimeout = 5000 // 5 segundos para conectar
-                connection.readTimeout = 15000 // 15 segundos para ler resposta
+                connection.readTimeout = 30000 // 30 segundos para ler resposta (pode tentar vários protocolos)
                 
                 val json = """
                     {

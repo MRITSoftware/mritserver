@@ -20,7 +20,7 @@ class TuyaClient {
         private const val DEFAULT_PROTOCOL_VERSION = 3.3 // Padrão 3.3 (como no Python)
         private const val PORT = 6668 // Porta para comandos
         private const val DISCOVERY_PORT = 6666 // Porta para descoberta
-        private const val TIMEOUT_MS = 3000 // Reduzido para 3s para acelerar o processo
+        private const val TIMEOUT_MS = 5000 // Timeout de 5s para dar tempo do dispositivo responder
         private const val DISCOVERY_TIMEOUT_MS = 5000 // 5s para descoberta
     }
     
@@ -74,36 +74,47 @@ class TuyaClient {
             // DPS 1 = power on/off
             // Tenta primeiro com formato numérico (1/0), que é mais comum
             // Se não funcionar, pode tentar booleano (true/false)
-            val commandNumeric = mapOf("1" to 1)  // DPS 1 = power on (numérico: 1 = ligar, 0 = desligar)
-            val commandBoolean = mapOf("1" to true)  // DPS 1 = power on (booleano)
+            val commandNumeric = if (action == "on") {
+                mapOf("1" to 1)  // DPS 1 = power on (numérico: 1 = ligar, 0 = desligar)
+            } else {
+                mapOf("1" to 0)  // DPS 1 = power off
+            }
+            val commandBoolean = if (action == "on") {
+                mapOf("1" to true)  // DPS 1 = power on (booleano)
+            } else {
+                mapOf("1" to false)  // DPS 1 = power off
+            }
             
-            // Tenta múltiplas variações do protocolo, começando com 3.3 (como no Python)
+            // Tenta primeiro com o protocolo informado pelo usuário
             var lastResponse: ByteArray? = null
             var success = false
+            val otherProtocol = if (protocolVersion == 3.3) 3.4 else 3.3
             
-            // Variação 1: Protocolo 3.3, formato numérico, sequence = 0 (COMO NO PYTHON)
-            log("[INFO] Tentativa 1: Protocolo 3.3, formato numérico, sequence=0 (como no Python)")
-            var payload = buildCommandPayload(commandNumeric, localKey, 3.3, sequenceZero = true)
+            // Tentativa 1: Protocolo informado pelo usuário, formato numérico
+            log("[INFO] Tentativa 1: Protocolo $protocolVersion (informado), formato numérico, sequence=0")
+            var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = true)
             for (attempt in 1..2) {
-                log("[INFO] Enviando tentativa $attempt de 2")
+                log("[INFO] Enviando tentativa $attempt de 2 com protocolo $protocolVersion")
                 val response = sendUdpPacket(lanIp, PORT, payload)
                 lastResponse = response
                 if (response != null && response.isNotEmpty()) {
-                    log("[DEBUG] ✅ Resposta recebida com protocolo 3.3!")
+                    log("[DEBUG] ✅ Resposta recebida com protocolo $protocolVersion!")
                     success = true
                     break
                 }
                 if (attempt < 2) kotlinx.coroutines.delay(200)
             }
             
-            // Variação 2: Protocolo 3.4, formato numérico, sequence = 0
+            // Tentativa 2: Outro protocolo (3.3 ou 3.4), formato numérico
             if (!success) {
-                log("[INFO] Tentativa 2: Protocolo 3.4, formato numérico, sequence=0")
-                payload = buildCommandPayload(commandNumeric, localKey, 3.4, sequenceZero = true)
+                log("[INFO] Tentativa 2: Protocolo $otherProtocol (alternativo), formato numérico, sequence=0")
+                payload = buildCommandPayload(commandNumeric, localKey, otherProtocol, sequenceZero = true)
                 for (attempt in 1..2) {
+                    log("[INFO] Enviando tentativa $attempt de 2 com protocolo $otherProtocol")
                     val response = sendUdpPacket(lanIp, PORT, payload)
+                    lastResponse = response
                     if (response != null && response.isNotEmpty()) {
-                        log("[DEBUG] ✅ Resposta recebida com protocolo 3.4!")
+                        log("[DEBUG] ✅ Resposta recebida com protocolo $otherProtocol!")
                         success = true
                         break
                     }
@@ -111,12 +122,14 @@ class TuyaClient {
                 }
             }
             
-            // Variação 3: Protocolo 3.3, formato booleano, sequence = 0
+            // Tentativa 3: Protocolo informado, formato booleano
             if (!success) {
-                log("[INFO] Tentativa 3: Protocolo 3.3, formato booleano, sequence=0")
-                payload = buildCommandPayload(commandBoolean, localKey, 3.3, sequenceZero = true)
+                log("[INFO] Tentativa 3: Protocolo $protocolVersion (informado), formato booleano, sequence=0")
+                payload = buildCommandPayload(commandBoolean, localKey, protocolVersion, sequenceZero = true)
                 for (attempt in 1..2) {
+                    log("[INFO] Enviando tentativa $attempt de 2 com formato booleano")
                     val response = sendUdpPacket(lanIp, PORT, payload)
+                    lastResponse = response
                     if (response != null && response.isNotEmpty()) {
                         log("[DEBUG] ✅ Resposta recebida com formato booleano!")
                         success = true
@@ -126,13 +139,33 @@ class TuyaClient {
                 }
             }
             
-            log("[INFO] Protocolo Tuya ${protocolVersion} usado")
-            if (success || lastResponse != null) {
-                log("[OK] Comando enviado com sucesso")
+            // Tentativa 4: Outro protocolo, formato booleano
+            if (!success) {
+                log("[INFO] Tentativa 4: Protocolo $otherProtocol (alternativo), formato booleano, sequence=0")
+                payload = buildCommandPayload(commandBoolean, localKey, otherProtocol, sequenceZero = true)
+                for (attempt in 1..2) {
+                    log("[INFO] Enviando tentativa $attempt de 2 com protocolo $otherProtocol e formato booleano")
+                    val response = sendUdpPacket(lanIp, PORT, payload)
+                    lastResponse = response
+                    if (response != null && response.isNotEmpty()) {
+                        log("[DEBUG] ✅ Resposta recebida com protocolo $otherProtocol e formato booleano!")
+                        success = true
+                        break
+                    }
+                    if (attempt < 2) kotlinx.coroutines.delay(200)
+                }
+            }
+            
+            log("[INFO] Protocolo Tuya solicitado: $protocolVersion")
+            if (success) {
+                log("[OK] ✅ Comando enviado com sucesso e confirmado pelo dispositivo")
+                Result.success(Unit)
+            } else if (lastResponse != null) {
+                log("[OK] ✅ Comando enviado (resposta vazia, mas pacote foi enviado)")
                 Result.success(Unit)
             } else {
-                log("[WARN] Comando enviado mas sem confirmação do dispositivo")
-                // Ainda retorna sucesso pois o pacote foi enviado
+                log("[WARN] ⚠️ Comando enviado mas sem confirmação do dispositivo")
+                // Ainda retorna sucesso pois o pacote foi enviado (alguns dispositivos não respondem)
                 Result.success(Unit)
             }
             

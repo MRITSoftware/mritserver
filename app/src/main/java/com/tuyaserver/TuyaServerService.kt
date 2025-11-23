@@ -118,7 +118,9 @@ class TuyaServerService : Service() {
                 httpServer = HttpServer(PORT, this@TuyaServerService)
                 Log.d(TAG, "[START] HttpServer criado, iniciando...")
                 
-                val started = httpServer?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+                // Timeout aumentado para 35 segundos (comando Tuya pode tentar múltiplos protocolos)
+                val socketTimeout = 35000 // 35 segundos
+                val started = httpServer?.start(socketTimeout, false)
                 Log.d(TAG, "[START] httpServer.start() retornou: $started")
                 
                 if (httpServer?.isAlive == true) {
