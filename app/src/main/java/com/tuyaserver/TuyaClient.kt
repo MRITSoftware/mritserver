@@ -50,11 +50,12 @@ class TuyaClient {
         
         try {
             log("[INFO] ========================================")
-            log("[INFO] Enviando comando Tuya")
+            log("[INFO] ENVIANDO COMANDO TUYA")
             log("[INFO] Device ID: $deviceId")
             log("[INFO] LAN IP: $lanIp")
-            log("[INFO] Protocolo: $protocolVersion")
+            log("[INFO] Protocolo: $protocolVersion ${if (protocolVersion >= 3.4) "(3.4 - com timestamp)" else "(3.3)"}")
             log("[INFO] Ação: $action (sempre 'on' = ligar)")
+            log("[INFO] Porta UDP: $PORT")
             log("[INFO] ========================================")
             
             // Comando sempre ligar (on) conforme solicitado
@@ -177,14 +178,22 @@ class TuyaClient {
         // Protocolo 3.4: version = 0x00000000 (mesmo valor, mas pode ter diferenças no payload)
         val protocolVersionInt = 0x00000000
         
-        // Sequence number: para protocolo 3.4, usa timestamp; para 3.3, usa 0
+        // Sequence number: para protocolo 3.4, alguns dispositivos usam timestamp, outros usam 0
+        // Vamos tentar com timestamp primeiro (padrão), mas alguns dispositivos podem precisar de 0
         val sequence = if (protocolVersion >= 3.4) {
-            timestamp // Usa timestamp como sequence para 3.4
+            timestamp // Usa timestamp como sequence para 3.4 (padrão)
         } else {
             0x00000000
         }
         
-        log("[DEBUG] Protocolo Tuya $protocolVersion - Header version: 0x${protocolVersionInt.toString(16)}, Sequence: 0x${sequence.toString(16)}")
+        log("[DEBUG] ========================================")
+        log("[DEBUG] PROTOCOLO TUYA $protocolVersion")
+        log("[DEBUG] Timestamp: $timestamp (${System.currentTimeMillis() / 1000})")
+        log("[DEBUG] Header version: 0x${protocolVersionInt.toString(16).padStart(8, '0')}")
+        log("[DEBUG] Sequence: 0x${sequence.toString(16).padStart(8, '0')} (decimal: $sequence)")
+        log("[DEBUG] Command: 0x0D (CONTROL)")
+        log("[DEBUG] Encrypted size: ${encrypted.size} bytes")
+        log("[DEBUG] ========================================")
         
         val packet = ByteBuffer.allocate(totalSize).apply {
             order(ByteOrder.BIG_ENDIAN)
@@ -200,7 +209,14 @@ class TuyaClient {
         
         val packetArray = packet.array()
         log("[DEBUG] Pacote completo: ${packetArray.size} bytes")
-        log("[DEBUG] Header hex: ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
+        log("[DEBUG] Header completo (24 bytes): ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
+        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (deve ser: 55 AA 00 00)")
+        log("[DEBUG] Version: ${packetArray.slice(4..7).joinToString(" ") { "%02X".format(it) }}")
+        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (deve ser: 00 00 00 0D)")
+        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes)")
+        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }}")
+        log("[DEBUG] Return code: ${packetArray.slice(20..23).joinToString(" ") { "%02X".format(it) }}")
+        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (deve ser: AA 55 00 00)")
         
         return packetArray
     }
