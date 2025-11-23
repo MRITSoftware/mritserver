@@ -18,9 +18,21 @@ class TuyaClient {
     companion object {
         private const val TAG = "TuyaClient"
         private const val DEFAULT_PROTOCOL_VERSION = 3.4 // Padrão 3.4
-        private const val PORT = 6668
+        private const val PORT = 6668 // Porta para comandos
+        private const val DISCOVERY_PORT = 6666 // Porta para descoberta
         private const val TIMEOUT_MS = 3000 // Reduzido para 3s para acelerar o processo
+        private const val DISCOVERY_TIMEOUT_MS = 5000 // 5s para descoberta
     }
+    
+    /**
+     * Classe de dados para representar um dispositivo Tuya descoberto
+     */
+    data class DiscoveredDevice(
+        val deviceId: String,
+        val ip: String,
+        val name: String? = null,
+        val version: String? = null
+    )
     
     /**
      * Envia comando para dispositivo Tuya
@@ -313,6 +325,122 @@ class TuyaClient {
         log("[DEBUG] Chave MD5: ${keyHash.joinToString(" ") { "%02X".format(it) }}")
         
         return keyHash
+    }
+    
+    /**
+     * Descobre dispositivos Tuya na rede local usando broadcast UDP
+     * @return Lista de dispositivos encontrados
+     */
+    suspend fun discoverDevices(): List<DiscoveredDevice> = withContext(Dispatchers.IO) {
+        val devices = mutableListOf<DiscoveredDevice>()
+        var socket: DatagramSocket? = null
+        
+        try {
+            log("[DISCOVERY] Iniciando descoberta de dispositivos Tuya...")
+            
+            socket = DatagramSocket().apply {
+                soTimeout = DISCOVERY_TIMEOUT_MS
+                broadcast = true // Permite broadcast
+            }
+            
+            // Pacote de descoberta Tuya (formato simplificado)
+            // Prefix: 0x000055AA, Command: 0x0000000A (DISCOVERY), Version: 0x00000000
+            val discoveryPacket = ByteBuffer.allocate(20).apply {
+                order(ByteOrder.BIG_ENDIAN)
+                putInt(0x000055AA) // prefix
+                putInt(0x00000000) // version
+                putInt(0x0000000A) // command (0x0A = DISCOVERY)
+                putInt(0x00000000) // length (0 para descoberta)
+                putInt(0x00000000) // sequence
+                putInt(0x0000AA55) // suffix
+            }.array()
+            
+            log("[DISCOVERY] Enviando pacote de descoberta (broadcast)...")
+            val broadcastAddress = InetAddress.getByName("255.255.255.255")
+            val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, broadcastAddress, DISCOVERY_PORT)
+            socket.send(packet)
+            
+            log("[DISCOVERY] Aguardando respostas (timeout: ${DISCOVERY_TIMEOUT_MS}ms)...")
+            
+            // Recebe respostas até o timeout
+            val startTime = System.currentTimeMillis()
+            while (System.currentTimeMillis() - startTime < DISCOVERY_TIMEOUT_MS) {
+                try {
+                    val buffer = ByteArray(1024)
+                    val responsePacket = DatagramPacket(buffer, buffer.size)
+                    socket.soTimeout = (DISCOVERY_TIMEOUT_MS - (System.currentTimeMillis() - startTime)).toInt().coerceAtLeast(100)
+                    socket.receive(responsePacket)
+                    
+                    val deviceIp = responsePacket.address.hostAddress ?: continue
+                    log("[DISCOVERY] Resposta recebida de $deviceIp: ${responsePacket.length} bytes")
+                    
+                    // Tenta extrair Device ID da resposta
+                    val deviceId = extractDeviceIdFromResponse(buffer, responsePacket.length)
+                    
+                    if (deviceId != null && deviceId != "unknown") {
+                        log("[DISCOVERY] ✅ Dispositivo encontrado: $deviceId @ $deviceIp")
+                        devices.add(DiscoveredDevice(
+                            deviceId = deviceId,
+                            ip = deviceIp
+                        ))
+                    } else {
+                        log("[DISCOVERY] ⚠️ Resposta recebida mas Device ID não identificado de $deviceIp")
+                    }
+                } catch (e: java.net.SocketTimeoutException) {
+                    // Timeout esperado quando não há mais respostas
+                    break
+                } catch (e: Exception) {
+                    log("[DISCOVERY] Erro ao receber resposta: ${e.message}")
+                }
+            }
+            
+            log("[DISCOVERY] Descoberta concluída. ${devices.size} dispositivo(s) encontrado(s)")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "[DISCOVERY] Erro na descoberta", e)
+        } finally {
+            socket?.close()
+        }
+        
+        return@withContext devices
+    }
+    
+    /**
+     * Tenta extrair o Device ID da resposta de descoberta
+     * O formato pode variar entre dispositivos
+     */
+    private fun extractDeviceIdFromResponse(data: ByteArray, length: Int): String? {
+        try {
+            // Tenta encontrar padrões comuns de Device ID (geralmente hex de 16 bytes = 32 chars)
+            // Device ID geralmente está no payload após o header de 24 bytes
+            if (length < 24) return null
+            
+            // Pula o header (24 bytes) e tenta ler o payload
+            val payloadStart = 24
+            if (length <= payloadStart) return null
+            
+            // Tenta decodificar como string (alguns dispositivos enviam Device ID como string)
+            val payload = data.sliceArray(payloadStart until length)
+            val payloadString = String(payload, Charsets.UTF_8).trim()
+            
+            // Procura por padrão de Device ID (geralmente hex de 16-32 caracteres)
+            val deviceIdPattern = Regex("[0-9a-fA-F]{16,32}")
+            val match = deviceIdPattern.find(payloadString)
+            if (match != null) {
+                return match.value.lowercase()
+            }
+            
+            // Se não encontrou, tenta ler os primeiros bytes do payload como hex
+            if (payload.size >= 16) {
+                val hexId = payload.take(16).joinToString("") { "%02x".format(it) }
+                return hexId
+            }
+            
+        } catch (e: Exception) {
+            log("[DISCOVERY] Erro ao extrair Device ID: ${e.message}")
+        }
+        
+        return null
     }
     
     private fun log(msg: String) {

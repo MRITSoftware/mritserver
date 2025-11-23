@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var siteNameText: TextView
     private lateinit var ipText: TextView
     private lateinit var ipContainer: LinearLayout
+    private val tuyaClient = TuyaClient()
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -264,7 +265,7 @@ class MainActivity : AppCompatActivity() {
         layout.addView(localKeyInput)
         layout.addView(lanIpInput)
         
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Comando Tuya - Ligar")
             .setMessage("Preencha os dados do dispositivo Tuya:\n\n• Device ID: ID do dispositivo\n• Local Key: Chave local\n• IP: IP do dispositivo na rede")
             .setView(layout)
@@ -280,8 +281,54 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show()
                 }
             }
+            .setNeutralButton("🔍 Descobrir") { _, _ ->
+                discoverTuyaDevices(deviceIdInput, lanIpInput)
+            }
             .setNegativeButton("Cancelar", null)
-            .show()
+            .create()
+        
+        dialog.show()
+    }
+    
+    private fun discoverTuyaDevices(deviceIdInput: EditText, lanIpInput: EditText) {
+        Toast.makeText(this, "🔍 Procurando dispositivos Tuya na rede...", Toast.LENGTH_SHORT).show()
+        
+        activityScope.launch(Dispatchers.IO) {
+            try {
+                val devices = tuyaClient.discoverDevices()
+                
+                withContext(Dispatchers.Main) {
+                    if (devices.isEmpty()) {
+                        Toast.makeText(this@MainActivity, "❌ Nenhum dispositivo Tuya encontrado na rede", Toast.LENGTH_LONG).show()
+                    } else {
+                        // Mostra lista de dispositivos para selecionar
+                        val deviceNames = devices.mapIndexed { index, device ->
+                            if (device.deviceId != "unknown") {
+                                "${device.deviceId.take(8)}... @ ${device.ip}"
+                            } else {
+                                "Dispositivo @ ${device.ip}"
+                            }
+                        }.toTypedArray()
+                        
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Dispositivos Encontrados (${devices.size})")
+                            .setItems(deviceNames) { _, which ->
+                                val selectedDevice = devices[which]
+                                deviceIdInput.setText(selectedDevice.deviceId)
+                                lanIpInput.setText(selectedDevice.ip)
+                                Toast.makeText(this@MainActivity, "✅ Dispositivo selecionado!", Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "❌ Erro ao descobrir: ${e.message}", Toast.LENGTH_LONG).show()
+                    android.util.Log.e("MainActivity", "Erro ao descobrir dispositivos", e)
+                }
+            }
+        }
     }
     
     private fun sendTuyaCommand(action: String, deviceId: String, localKey: String, lanIp: String) {
