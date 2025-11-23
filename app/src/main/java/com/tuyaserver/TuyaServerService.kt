@@ -16,7 +16,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
-import io.ktor.server.netty.*
+import io.ktor.server.cio.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -37,7 +37,7 @@ class TuyaServerService : Service() {
         private const val NOTIFICATION_ID = 1
     }
     
-    private var server: NettyApplicationEngine? = null
+    private var server: CIOApplicationEngine? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var configManager: ConfigManager
     private val tuyaClient = TuyaClient()
@@ -119,7 +119,8 @@ class TuyaServerService : Service() {
                 Log.d(TAG, "Iniciando servidor HTTP na porta $PORT...")
                 Log.d(TAG, "Host: 0.0.0.0 (aceita conexões de qualquer interface)")
                 
-                server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
+                Log.d(TAG, "Criando servidor CIO (melhor para Android)...")
+                server = embeddedServer(CIO, host = "0.0.0.0", port = PORT) {
                     environment.monitor.subscribe(ApplicationStarted) {
                         Log.d(TAG, "[SERVER] Servidor HTTP iniciado e escutando na porta $PORT")
                     }
@@ -228,19 +229,20 @@ class TuyaServerService : Service() {
                     }
                 }
                 
-                Log.d(TAG, "[START] Iniciando servidor Netty...")
+                Log.d(TAG, "[START] Iniciando servidor CIO...")
                 
                 // Tenta iniciar o servidor
                 try {
                     server?.start(wait = false)
-                    Log.d(TAG, "[START] Comando start() executado")
+                    Log.d(TAG, "[START] Comando start() executado com sucesso")
                 } catch (e: Exception) {
-                    Log.e(TAG, "[START] Erro ao executar start()", e)
+                    Log.e(TAG, "[START] ❌ Erro ao executar start()", e)
+                    e.printStackTrace()
                     throw e
                 }
                 
-                // Aguarda um pouco para o servidor iniciar
-                kotlinx.coroutines.delay(2000)
+                // Aguarda o servidor iniciar completamente
+                kotlinx.coroutines.delay(3000)
                 
                 // Verifica se o servidor está rodando
                 try {
@@ -251,7 +253,7 @@ class TuyaServerService : Service() {
                         }
                         Log.d(TAG, "[START] ✅ Servidor MRIT rodando! (SITE=${getSiteName()})")
                     } else {
-                        Log.w(TAG, "[START] ⚠️ Servidor iniciado mas connectors vazios")
+                        Log.w(TAG, "[START] ⚠️ Servidor iniciado mas connectors vazios - pode estar ainda iniciando")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "[START] Erro ao verificar connectors", e)

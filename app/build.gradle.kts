@@ -55,7 +55,7 @@ dependencies {
     
     // Ktor para servidor HTTP
     implementation("io.ktor:ktor-server-core:2.3.5")
-    implementation("io.ktor:ktor-server-netty:2.3.5")
+    implementation("io.ktor:ktor-server-cio:2.3.5") // CIOServer funciona melhor no Android
     implementation("io.ktor:ktor-server-content-negotiation:2.3.5")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.5")
     
