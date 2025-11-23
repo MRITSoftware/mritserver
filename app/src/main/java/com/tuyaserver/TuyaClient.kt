@@ -93,27 +93,13 @@ class TuyaClient(private val context: Context? = null) {
             var success = false
             val otherProtocol = if (protocolVersion == 3.3) 3.4 else 3.3
             
-            // Tentativa 1: Protocolo informado, formato numérico, sequence=0
-            log("[INFO] Tentativa 1: Protocolo $protocolVersion (informado), formato numérico, sequence=0")
-            var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = true)
-            for (attempt in 1..3) {
-                log("[INFO] Enviando tentativa $attempt de 3 com protocolo $protocolVersion")
-                val response = sendUdpPacket(lanIp, PORT, payload)
-                lastResponse = response
-                if (response != null && response.isNotEmpty()) {
-                    log("[DEBUG] ✅ Resposta recebida com protocolo $protocolVersion!")
-                    success = true
-                    break
-                }
-                if (attempt < 3) kotlinx.coroutines.delay(300)
-            }
-            
-            // Tentativa 1.5: Protocolo 3.4 com timestamp no sequence (se for 3.4)
-            if (!success && protocolVersion >= 3.4) {
-                log("[INFO] Tentativa 1.5: Protocolo $protocolVersion, formato numérico, sequence=timestamp")
-                payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = false)
-                for (attempt in 1..2) {
-                    log("[INFO] Enviando tentativa $attempt de 2 com protocolo $protocolVersion e timestamp no sequence")
+            // Para protocolo 3.4, tenta primeiro com timestamp no sequence (como tinytuya faz)
+            // Tentativa 1: Protocolo 3.4 com timestamp no sequence (se for 3.4)
+            if (protocolVersion >= 3.4) {
+                log("[INFO] Tentativa 1: Protocolo $protocolVersion, formato numérico, sequence=timestamp (como tinytuya)")
+                var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = false)
+                for (attempt in 1..3) {
+                    log("[INFO] Enviando tentativa $attempt de 3 com protocolo $protocolVersion e timestamp no sequence")
                     val response = sendUdpPacket(lanIp, PORT, payload)
                     lastResponse = response
                     if (response != null && response.isNotEmpty()) {
@@ -121,14 +107,31 @@ class TuyaClient(private val context: Context? = null) {
                         success = true
                         break
                     }
-                    if (attempt < 2) kotlinx.coroutines.delay(300)
+                    if (attempt < 3) kotlinx.coroutines.delay(300)
                 }
             }
             
-            // Tentativa 2: Outro protocolo (3.3 ou 3.4), formato numérico
+            // Tentativa 2: Protocolo informado, formato numérico, sequence=0
             if (!success) {
-                log("[INFO] Tentativa 2: Protocolo $otherProtocol (alternativo), formato numérico, sequence=0")
-                payload = buildCommandPayload(commandNumeric, localKey, otherProtocol, sequenceZero = true)
+                log("[INFO] Tentativa 2: Protocolo $protocolVersion (informado), formato numérico, sequence=0")
+                var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = true)
+                for (attempt in 1..3) {
+                    log("[INFO] Enviando tentativa $attempt de 3 com protocolo $protocolVersion")
+                    val response = sendUdpPacket(lanIp, PORT, payload)
+                    lastResponse = response
+                    if (response != null && response.isNotEmpty()) {
+                        log("[DEBUG] ✅ Resposta recebida com protocolo $protocolVersion!")
+                        success = true
+                        break
+                    }
+                    if (attempt < 3) kotlinx.coroutines.delay(300)
+                }
+            }
+            
+            // Tentativa 3: Outro protocolo (3.3 ou 3.4), formato numérico
+            if (!success) {
+                log("[INFO] Tentativa 3: Protocolo $otherProtocol (alternativo), formato numérico, sequence=0")
+                var payload = buildCommandPayload(commandNumeric, localKey, otherProtocol, sequenceZero = true)
                 for (attempt in 1..3) {
                     log("[INFO] Enviando tentativa $attempt de 3 com protocolo $otherProtocol")
                     val response = sendUdpPacket(lanIp, PORT, payload)
@@ -142,10 +145,10 @@ class TuyaClient(private val context: Context? = null) {
                 }
             }
             
-            // Tentativa 3: Protocolo informado, formato booleano
+            // Tentativa 4: Protocolo informado, formato booleano
             if (!success) {
-                log("[INFO] Tentativa 3: Protocolo $protocolVersion (informado), formato booleano, sequence=0")
-                payload = buildCommandPayload(commandBoolean, localKey, protocolVersion, sequenceZero = true)
+                log("[INFO] Tentativa 4: Protocolo $protocolVersion (informado), formato booleano, sequence=0")
+                var payload = buildCommandPayload(commandBoolean, localKey, protocolVersion, sequenceZero = true)
                 for (attempt in 1..2) {
                     log("[INFO] Enviando tentativa $attempt de 2 com formato booleano")
                     val response = sendUdpPacket(lanIp, PORT, payload)
@@ -155,24 +158,7 @@ class TuyaClient(private val context: Context? = null) {
                         success = true
                         break
                     }
-                    if (attempt < 2) kotlinx.coroutines.delay(200)
-                }
-            }
-            
-            // Tentativa 4: Outro protocolo, formato booleano
-            if (!success) {
-                log("[INFO] Tentativa 4: Protocolo $otherProtocol (alternativo), formato booleano, sequence=0")
-                payload = buildCommandPayload(commandBoolean, localKey, otherProtocol, sequenceZero = true)
-                for (attempt in 1..2) {
-                    log("[INFO] Enviando tentativa $attempt de 2 com protocolo $otherProtocol e formato booleano")
-                    val response = sendUdpPacket(lanIp, PORT, payload)
-                    lastResponse = response
-                    if (response != null && response.isNotEmpty()) {
-                        log("[DEBUG] ✅ Resposta recebida com protocolo $otherProtocol e formato booleano!")
-                        success = true
-                        break
-                    }
-                    if (attempt < 2) kotlinx.coroutines.delay(200)
+                    if (attempt < 2) kotlinx.coroutines.delay(300)
                 }
             }
             
@@ -184,9 +170,10 @@ class TuyaClient(private val context: Context? = null) {
                 log("[OK] ✅ Comando enviado (resposta vazia, mas pacote foi enviado)")
                 Result.success(Unit)
             } else {
-                log("[WARN] ⚠️ Comando enviado mas sem confirmação do dispositivo")
-                // Ainda retorna sucesso pois o pacote foi enviado (alguns dispositivos não respondem)
-                Result.success(Unit)
+                log("[ERROR] ❌ Comando enviado mas sem confirmação do dispositivo após todas as tentativas")
+                log("[ERROR] Verifique: IP correto ($lanIp), Local Key correta, dispositivo na mesma rede")
+                // Retorna falha para que o usuário saiba que não funcionou
+                Result.failure(RuntimeException("Timeout: dispositivo não respondeu após todas as tentativas. Verifique IP, Local Key e rede."))
             }
             
         } catch (e: Exception) {
