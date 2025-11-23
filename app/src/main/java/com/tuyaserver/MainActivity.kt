@@ -21,12 +21,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 
 class MainActivity : AppCompatActivity() {
     
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var configManager: ConfigManager
     private lateinit var statusText: TextView
     private lateinit var siteNameText: TextView
@@ -302,7 +304,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Enviando comando...", Toast.LENGTH_SHORT).show()
         
         // Envia comando via HTTP usando coroutines
-        CoroutineScope(Dispatchers.IO).launch {
+        activityScope.launch(Dispatchers.IO) {
             try {
                 val url = java.net.URL("http://$localIp:8000/tuya/command")
                 val connection = url.openConnection() as java.net.HttpURLConnection
