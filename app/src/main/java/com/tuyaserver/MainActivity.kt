@@ -324,8 +324,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 """.trimIndent()
                 
+                val jsonBytes = json.toByteArray(Charsets.UTF_8)
+                connection.setRequestProperty("Content-Length", jsonBytes.size.toString())
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                
                 connection.outputStream.use { os ->
-                    os.write(json.toByteArray(Charsets.UTF_8))
+                    os.write(jsonBytes)
+                    os.flush()
                 }
                 
                 val responseCode = connection.responseCode

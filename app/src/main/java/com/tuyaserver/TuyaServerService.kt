@@ -197,35 +197,93 @@ class TuyaServerService : Service() {
             
             Log.d(TAG, "[HTTP] $method $uri de $remoteIp")
             
-            return when {
-                uri == "/" && method == Method.GET -> {
-                    Log.d(TAG, "[HTTP] GET / respondido")
-                    newFixedLengthResponse(Response.Status.OK, "text/plain", "MRIT Server está rodando!")
-                }
-                
-                uri == "/health" && method == Method.GET -> {
-                    try {
-                        val siteName = service.getSiteName()
-                        val response = HealthResponse(status = "ok", site = siteName)
-                        val jsonResponse = json.encodeToString(serializer<HealthResponse>(), response)
-                        Log.d(TAG, "[HTTP] GET /health respondido: $jsonResponse")
-                        newFixedLengthResponse(Response.Status.OK, "application/json", jsonResponse)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "[HTTP] Erro ao responder /health", e)
-                        val errorResponse = TuyaCommandResponse(ok = false, error = "Erro interno: ${e.message}")
-                        val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
-                        newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
+            return try {
+                when {
+                    uri == "/" && method == Method.GET -> {
+                        Log.d(TAG, "[HTTP] GET / respondido")
+                        val response = newFixedLengthResponse(Response.Status.OK, "text/plain", "MRIT Server está rodando!")
+                        response.addHeader("Access-Control-Allow-Origin", "*")
+                        response
                     }
-                }
-                
-                uri == "/tuya/command" && method == Method.POST -> {
-                    try {
-                        val contentLength = session.headers["content-length"]?.toIntOrNull() ?: 0
-                        val body = ByteArray(contentLength)
-                        session.inputStream.read(body)
-                        val bodyString = String(body, Charsets.UTF_8)
-                        
-                        Log.d(TAG, "[HTTP] POST /tuya/command recebido: $bodyString")
+                    
+                    uri == "/health" && method == Method.GET -> {
+                        try {
+                            val siteName = service.getSiteName()
+                            val responseObj = HealthResponse(status = "ok", site = siteName)
+                            val jsonResponse = json.encodeToString(serializer<HealthResponse>(), responseObj)
+                            Log.d(TAG, "[HTTP] GET /health respondido: $jsonResponse")
+                            val response = newFixedLengthResponse(Response.Status.OK, "application/json", jsonResponse)
+                            response.addHeader("Access-Control-Allow-Origin", "*")
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            response
+                        } catch (e: Exception) {
+                            Log.e(TAG, "[HTTP] Erro ao responder /health", e)
+                            e.printStackTrace()
+                            val errorResponse = TuyaCommandResponse(ok = false, error = "Erro interno: ${e.message}")
+                            val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
+                            val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            response
+                        }
+                    }
+                    
+                    uri == "/tuya/command" && method == Method.POST -> {
+                        try {
+                            // Lê o body do POST diretamente
+                            val bodyString = try {
+                                val contentLengthHeader = session.headers["content-length"]
+                                Log.d(TAG, "[HTTP] Content-Length: $contentLengthHeader")
+                                
+                                if (contentLengthHeader != null) {
+                                    val contentLength = contentLengthHeader.toIntOrNull() ?: 0
+                                    if (contentLength > 0 && contentLength < 100000) { // Limite de 100KB
+                                        val bodyBytes = ByteArray(contentLength)
+                                        var totalRead = 0
+                                        val inputStream = session.inputStream
+                                        
+                                        while (totalRead < contentLength) {
+                                            val bytesRead = inputStream.read(
+                                                bodyBytes, 
+                                                totalRead, 
+                                                contentLength - totalRead
+                                            )
+                                            if (bytesRead == -1) {
+                                                Log.w(TAG, "[HTTP] Stream terminou antes de ler tudo. Lido: $totalRead/$contentLength")
+                                                break
+                                            }
+                                            totalRead += bytesRead
+                                        }
+                                        
+                                        if (totalRead > 0) {
+                                            String(bodyBytes, 0, totalRead, Charsets.UTF_8)
+                                        } else {
+                                            ""
+                                        }
+                                    } else {
+                                        // Sem content-length ou muito grande, tenta ler tudo
+                                        val reader = java.io.BufferedReader(
+                                            java.io.InputStreamReader(session.inputStream, Charsets.UTF_8)
+                                        )
+                                        reader.readText()
+                                    }
+                                } else {
+                                    // Sem content-length, tenta ler tudo
+                                    val reader = java.io.BufferedReader(
+                                        java.io.InputStreamReader(session.inputStream, Charsets.UTF_8)
+                                    )
+                                    reader.readText()
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "[HTTP] Erro ao ler body: ${e.message}", e)
+                                e.printStackTrace()
+                                throw e
+                            }
+                            
+                            if (bodyString.isEmpty()) {
+                                throw Exception("Body vazio")
+                            }
+                            
+                            Log.d(TAG, "[HTTP] POST /tuya/command recebido (${bodyString.length} bytes): $bodyString")
                         
                         val request = json.decodeFromString<TuyaCommandRequest>(bodyString)
                         Log.d(TAG, "[HTTP] Request parseado: action=${request.action}, protocol=${request.protocol_version}")
@@ -238,7 +296,9 @@ class TuyaServerService : Service() {
                             )
                             val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                             Log.d(TAG, "[HTTP] POST /tuya/command respondido com erro: Ação inválida")
-                            return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
+                            val response = newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            return response
                         }
                         
                         val protocolVersion = request.protocol_version ?: 3.4 // Padrão 3.4
@@ -250,7 +310,9 @@ class TuyaServerService : Service() {
                             )
                             val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                             Log.d(TAG, "[HTTP] POST /tuya/command respondido com erro: Versão de protocolo inválida")
-                            return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
+                            val response = newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            return response
                         }
                         
                         Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo $protocolVersion")
@@ -270,27 +332,39 @@ class TuyaServerService : Service() {
                             Log.d(TAG, "[HTTP] Comando Tuya enviado com sucesso")
                             val successResponse = TuyaCommandResponse(ok = true, error = null)
                             val jsonSuccess = json.encodeToString(serializer<TuyaCommandResponse>(), successResponse)
-                            newFixedLengthResponse(Response.Status.OK, "application/json", jsonSuccess)
+                            val response = newFixedLengthResponse(Response.Status.OK, "application/json", jsonSuccess)
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            response
                         } else {
                             val error = result.exceptionOrNull()?.message ?: "Erro desconhecido"
                             Log.e(TAG, "[HTTP] Erro ao enviar comando Tuya: $error")
                             val errorResponse = TuyaCommandResponse(ok = false, error = error)
                             val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
-                            newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
+                            val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            response
                         }
                     } catch (e: Exception) {
                         val error = e.message ?: "Erro desconhecido"
                         Log.e(TAG, "[HTTP] Erro ao processar /tuya/command: $error", e)
+                        e.printStackTrace()
                         val errorResponse = TuyaCommandResponse(ok = false, error = error)
                         val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
-                        newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
+                        val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
+                        response.addHeader("Content-Type", "application/json; charset=utf-8")
+                        response
+                    }
+                    }
+                    
+                    else -> {
+                        Log.w(TAG, "[HTTP] Rota não encontrada: $method $uri")
+                        newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found")
                     }
                 }
-                
-                else -> {
-                    Log.w(TAG, "[HTTP] Rota não encontrada: $method $uri")
-                    newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found")
-                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[HTTP] Erro geral no servidor: ${e.message}", e)
+                e.printStackTrace()
+                newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Internal Server Error: ${e.message}")
             }
         }
     }
