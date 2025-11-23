@@ -250,31 +250,65 @@ class TuyaClient(private val context: Context? = null) {
         log("[DEBUG] Encrypted size: ${encrypted.size} bytes")
         log("[DEBUG] ========================================")
         
-        // Protocolo Tuya: os bytes devem estar na ordem específica
-        // Prefix: 0x000055AA = [0x00, 0x00, 0x55, 0xAA] em big-endian
-        // Mas alguns protocolos Tuya esperam [0x55, 0xAA, 0x00, 0x00]
-        // Vamos criar manualmente para garantir a ordem correta
-        val packet = ByteBuffer.allocate(totalSize).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            // Prefix: 0x000055AA -> bytes: 00 00 55 AA
-            putInt(0x000055AA)
-            // Version: 0x00000000
-            putInt(protocolVersionInt)
-            // Command: 0x0000000D
-            putInt(0x0000000D)
-            // Length: tamanho do payload criptografado
-            putInt(encrypted.size)
-            // Sequence: timestamp ou 0
-            putInt(sequence)
-            // Return code: 0x00000000
-            putInt(0x00000000)
-            // Payload criptografado
-            put(encrypted)
-            // Suffix: 0x0000AA55 -> bytes: 00 00 AA 55
-            putInt(0x0000AA55)
-        }
+        // Protocolo Tuya: ordem de bytes específica
+        // Prefix deve ser: 55 AA 00 00 (não 00 00 55 AA)
+        // Suffix deve ser: AA 55 00 00 (não 00 00 AA 55)
+        // Vamos criar os bytes manualmente na ordem correta
+        val packet = ByteArray(totalSize)
+        var offset = 0
         
-        val packetArray = packet.array()
+        // Prefix: 55 AA 00 00
+        packet[offset++] = 0x55.toByte()
+        packet[offset++] = 0xAA.toByte()
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        
+        // Version: 00 00 00 00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        
+        // Command: 00 00 00 0D
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x0D.toByte()
+        
+        // Length: 4 bytes em big-endian
+        val lengthBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(encrypted.size)
+        }.array()
+        System.arraycopy(lengthBytes, 0, packet, offset, 4)
+        offset += 4
+        
+        // Sequence: 4 bytes em big-endian
+        val sequenceBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(sequence)
+        }.array()
+        System.arraycopy(sequenceBytes, 0, packet, offset, 4)
+        offset += 4
+        
+        // Return code: 00 00 00 00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        
+        // Payload criptografado
+        System.arraycopy(encrypted, 0, packet, offset, encrypted.size)
+        offset += encrypted.size
+        
+        // Suffix: AA 55 00 00
+        packet[offset++] = 0xAA.toByte()
+        packet[offset++] = 0x55.toByte()
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        
+        val packetArray = packet
+        
         log("[DEBUG] Pacote completo: ${packetArray.size} bytes")
         log("[DEBUG] Header completo (24 bytes): ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
         log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 55 AA = 0x000055AA)")
