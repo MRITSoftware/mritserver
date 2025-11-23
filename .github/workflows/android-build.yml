@@ -23,19 +23,29 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Setup Gradle
-      uses: gradle/gradle-build-action@v2
-      with:
-        gradle-version: 8.4
-      
     - name: Setup Gradle Wrapper
       run: |
         mkdir -p gradle/wrapper
         if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-          echo "Gerando Gradle Wrapper..."
-          gradle wrapper --gradle-version 8.4 --distribution-type bin
+          echo "Baixando gradle-wrapper.jar do Maven Central..."
+          # Baixa o gradle-wrapper.jar do Maven Central (mais confiável)
+          curl -L -o gradle/wrapper/gradle-wrapper.jar \
+            https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar || \
+          {
+            echo "Fallback: Gerando wrapper com Gradle..."
+            # Fallback: instala Gradle e gera wrapper
+            wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
+            unzip -q /tmp/gradle.zip -d /tmp
+            /tmp/gradle-8.4/bin/gradle wrapper --gradle-version 8.4 --distribution-type bin
+          }
         fi
         chmod +x gradlew
+        # Verifica se o jar existe
+        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          echo "ERRO: gradle-wrapper.jar não foi criado!"
+          exit 1
+        fi
+        echo "✅ gradle-wrapper.jar verificado"
       
     - name: Build with Gradle
       run: |
