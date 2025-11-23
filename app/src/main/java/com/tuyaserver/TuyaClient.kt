@@ -443,6 +443,58 @@ class TuyaClient {
         return null
     }
     
+    /**
+     * Tenta descobrir se um IP específico é um dispositivo Tuya
+     * Envia um pacote de descoberta diretamente para o IP
+     */
+    suspend fun probeDevice(ip: String): DiscoveredDevice? = withContext(Dispatchers.IO) {
+        var socket: DatagramSocket? = null
+        
+        try {
+            socket = DatagramSocket().apply {
+                soTimeout = 500 // Timeout curto para escaneamento rápido
+                broadcast = false
+            }
+            
+            // Pacote de descoberta Tuya
+            val discoveryPacket = ByteBuffer.allocate(20).apply {
+                order(ByteOrder.BIG_ENDIAN)
+                putInt(0x000055AA) // prefix
+                putInt(0x00000000) // version
+                putInt(0x0000000A) // command (0x0A = DISCOVERY)
+                putInt(0x00000000) // length
+                putInt(0x00000000) // sequence
+                putInt(0x0000AA55) // suffix
+            }.array()
+            
+            val address = InetAddress.getByName(ip)
+            val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, address, DISCOVERY_PORT)
+            socket.send(packet)
+            
+            // Tenta receber resposta
+            val buffer = ByteArray(1024)
+            val responsePacket = DatagramPacket(buffer, buffer.size)
+            socket.receive(responsePacket)
+            
+            // Se recebeu resposta, é provavelmente um dispositivo Tuya
+            val deviceId = extractDeviceIdFromResponse(buffer, responsePacket.length)
+            
+            return@withContext DiscoveredDevice(
+                deviceId = deviceId ?: "unknown",
+                ip = ip
+            )
+            
+        } catch (e: java.net.SocketTimeoutException) {
+            // Timeout = não é dispositivo Tuya ou não respondeu
+            return@withContext null
+        } catch (e: Exception) {
+            // Erro = não é dispositivo Tuya
+            return@withContext null
+        } finally {
+            socket?.close()
+        }
+    }
+    
     private fun log(msg: String) {
         Log.d(TAG, msg)
     }
