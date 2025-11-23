@@ -339,9 +339,26 @@ class TuyaClient(private val context: Context? = null) {
             log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
             log("[UDP] Primeiros 32 bytes do pacote: ${data.take(32).joinToString(" ") { "%02X".format(it) }}")
             
-            socket.send(packet)
-            log("[UDP] ✅ Pacote enviado com sucesso: ${data.size} bytes")
-            log("[UDP] Hex completo do pacote: ${data.joinToString(" ") { "%02X".format(it) }}")
+            // Verifica se o socket está conectado e pronto
+            if (socket.isClosed) {
+                log("[UDP] ❌ ERRO: Socket está fechado!")
+                return null
+            }
+            
+            try {
+                socket.send(packet)
+                log("[UDP] ✅ Pacote enviado com sucesso: ${data.size} bytes")
+                log("[UDP] Hex completo do pacote: ${data.joinToString(" ") { "%02X".format(it) }}")
+                log("[UDP] Socket local após envio: ${socket.localAddress?.hostAddress}:${socket.localPort}")
+            } catch (e: java.io.IOException) {
+                log("[UDP] ❌ ERRO ao enviar pacote: ${e.message}")
+                e.printStackTrace()
+                return null
+            } catch (e: Exception) {
+                log("[UDP] ❌ ERRO inesperado ao enviar: ${e.javaClass.simpleName}: ${e.message}")
+                e.printStackTrace()
+                return null
+            }
             
             // Tenta receber resposta
             val buffer = ByteArray(1024)
