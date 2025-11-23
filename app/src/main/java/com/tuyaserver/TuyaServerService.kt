@@ -138,7 +138,7 @@ class TuyaServerService : Service() {
                     
                     routing {
                         get("/health") {
-                            Log.d(TAG, "[HTTP] GET /health recebido de ${call.request.remoteHost}")
+                            Log.d(TAG, "[HTTP] GET /health recebido de ${call.request.local.remoteHost}")
                             try {
                                 val response = HealthResponse(status = "ok", site = getSiteName())
                                 call.respond(HttpStatusCode.OK, response)
