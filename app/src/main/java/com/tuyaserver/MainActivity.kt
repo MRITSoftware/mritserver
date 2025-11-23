@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
         val startButton: Button = findViewById(R.id.startButton)
         val stopButton: Button = findViewById(R.id.stopButton)
         val configButton: Button = findViewById(R.id.configButton)
+        val tuyaCommandButton: Button = findViewById(R.id.tuyaCommandButton)
         
         // Configurar clique para copiar IP
         ipContainer.setOnClickListener {
@@ -70,16 +71,15 @@ class MainActivity : AppCompatActivity() {
         }
         
         stopButton.setOnClickListener {
-            try {
-                stopService(Intent(this, TuyaServerService::class.java))
-                updateUI()
-            } catch (e: Exception) {
-                statusText.text = "Erro: ${e.message}"
-            }
+            showStopConfirmation()
         }
         
         configButton.setOnClickListener {
             showConfigDialog()
+        }
+        
+        tuyaCommandButton.setOnClickListener {
+            showTuyaCommandDialog()
         }
     }
     
@@ -93,12 +93,16 @@ class MainActivity : AppCompatActivity() {
         
         // Verifica se o serviço está rodando
         val isRunning = isServiceRunning(TuyaServerService::class.java)
+        val tuyaCommandButton: Button = findViewById(R.id.tuyaCommandButton)
+        
         if (isRunning) {
             statusText.text = "Servidor: Rodando na porta 8000"
             statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark))
+            tuyaCommandButton.visibility = android.view.View.VISIBLE
         } else {
             statusText.text = "Servidor: Parado"
             statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+            tuyaCommandButton.visibility = android.view.View.GONE
         }
     }
     
@@ -169,6 +173,23 @@ class MainActivity : AppCompatActivity() {
         return false
     }
     
+    private fun showStopConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Parar Servidor")
+            .setMessage("Tem certeza que deseja parar o servidor?")
+            .setPositiveButton("Sim, Parar") { _, _ ->
+                try {
+                    stopService(Intent(this, TuyaServerService::class.java))
+                    updateUI()
+                    Toast.makeText(this, "Servidor parado", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    statusText.text = "Erro: ${e.message}"
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+    
     private fun showConfigDialog() {
         val input = EditText(this)
         input.hint = "Nome do site (ex: GELAFIT_SP01)"
@@ -195,6 +216,131 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+    
+    private fun showTuyaCommandDialog() {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 10)
+        }
+        
+        val actionInput = EditText(this).apply {
+            hint = "Ação (on/off)"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 16
+            }
+        }
+        
+        val deviceIdInput = EditText(this).apply {
+            hint = "Device ID"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 16
+            }
+        }
+        
+        val localKeyInput = EditText(this).apply {
+            hint = "Local Key"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 16
+            }
+        }
+        
+        val lanIpInput = EditText(this).apply {
+            hint = "LAN IP do dispositivo Tuya"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        
+        layout.addView(actionInput)
+        layout.addView(deviceIdInput)
+        layout.addView(localKeyInput)
+        layout.addView(lanIpInput)
+        
+        AlertDialog.Builder(this)
+            .setTitle("Comando Tuya")
+            .setMessage("Preencha os dados do dispositivo:")
+            .setView(layout)
+            .setPositiveButton("Enviar") { _, _ ->
+                val action = actionInput.text.toString().trim()
+                val deviceId = deviceIdInput.text.toString().trim()
+                val localKey = localKeyInput.text.toString().trim()
+                val lanIp = lanIpInput.text.toString().trim()
+                
+                if (action.isNotEmpty() && deviceId.isNotEmpty() && localKey.isNotEmpty() && lanIp.isNotEmpty()) {
+                    sendTuyaCommand(action, deviceId, localKey, lanIp)
+                } else {
+                    Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+    
+    private fun sendTuyaCommand(action: String, deviceId: String, localKey: String, lanIp: String) {
+        val localIp = getLocalIpAddress()
+        if (localIp == "Não disponível") {
+            Toast.makeText(this, "IP não disponível", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Mostra loading
+        Toast.makeText(this, "Enviando comando...", Toast.LENGTH_SHORT).show()
+        
+        // Envia comando via HTTP
+        Thread {
+            try {
+                val url = java.net.URL("http://$localIp:8000/tuya/command")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                
+                val json = """
+                    {
+                        "action": "$action",
+                        "tuya_device_id": "$deviceId",
+                        "local_key": "$localKey",
+                        "lan_ip": "$lanIp",
+                        "protocol_version": 3.4
+                    }
+                """.trimIndent()
+                
+                connection.outputStream.use { os ->
+                    os.write(json.toByteArray())
+                }
+                
+                val responseCode = connection.responseCode
+                val response = if (responseCode == 200) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Erro desconhecido"
+                }
+                
+                runOnUiThread {
+                    if (responseCode == 200) {
+                        Toast.makeText(this, "Comando enviado com sucesso!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this, "Erro: $response", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "Erro ao enviar: ${e.message}", Toast.LENGTH_LONG).show()
+                    android.util.Log.e("MainActivity", "Erro ao enviar comando Tuya", e)
+                }
+            }
+        }.start()
     }
 }
 

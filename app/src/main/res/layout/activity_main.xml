@@ -120,7 +120,17 @@
         android:layout_height="56dp"
         android:text="Configurar Site"
         android:textSize="16sp"
-        android:backgroundTint="#2196F3" />
+        android:backgroundTint="#2196F3"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/tuyaCommandButton"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="Comando Tuya"
+        android:textSize="16sp"
+        android:backgroundTint="#FF9800"
+        android:visibility="gone" />
 
     <!-- Spacer -->
     <View

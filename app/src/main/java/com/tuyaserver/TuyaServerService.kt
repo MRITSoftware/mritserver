@@ -224,22 +224,36 @@ class TuyaServerService : Service() {
                 }
                 
                 Log.d(TAG, "[START] Iniciando servidor Netty...")
-                server?.start(wait = false)
+                
+                // Tenta iniciar o servidor
+                try {
+                    server?.start(wait = false)
+                    Log.d(TAG, "[START] Comando start() executado")
+                } catch (e: Exception) {
+                    Log.e(TAG, "[START] Erro ao executar start()", e)
+                    throw e
+                }
                 
                 // Aguarda um pouco para o servidor iniciar
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(2000)
                 
                 // Verifica se o servidor está rodando
-                val isRunning = server?.resolvedConnectors()?.isNotEmpty() == true
-                if (isRunning) {
+                try {
                     val connectors = server?.resolvedConnectors() ?: emptyList()
-                    connectors.forEach { connector ->
-                        Log.d(TAG, "[START] Servidor escutando em: ${connector.type}://${connector.host}:${connector.port}")
+                    if (connectors.isNotEmpty()) {
+                        connectors.forEach { connector ->
+                            Log.d(TAG, "[START] ✅ Servidor escutando em: ${connector.type}://${connector.host}:${connector.port}")
+                        }
+                        Log.d(TAG, "[START] ✅ Servidor MRIT rodando! (SITE=${getSiteName()})")
+                    } else {
+                        Log.w(TAG, "[START] ⚠️ Servidor iniciado mas connectors vazios")
                     }
-                    Log.d(TAG, "[START] ✅ Servidor MRIT rodando! (SITE=${getSiteName()})")
-                } else {
-                    Log.w(TAG, "[START] ⚠️ Servidor iniciado mas não confirmou escuta na porta")
+                } catch (e: Exception) {
+                    Log.e(TAG, "[START] Erro ao verificar connectors", e)
                 }
+                
+                // Testa se a porta está realmente aberta
+                testLocalConnection()
                 
                 Log.d(TAG, "[START] Servidor MRIT local rodando em http://0.0.0.0:$PORT (SITE=${getSiteName()})")
                 
@@ -258,6 +272,29 @@ class TuyaServerService : Service() {
                 } catch (ex: Exception) {
                     Log.e(TAG, "Erro ao atualizar notificação", ex)
                 }
+            }
+        }
+    }
+    
+    private fun testLocalConnection() {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                kotlinx.coroutines.delay(3000) // Aguarda mais um pouco
+                val url = java.net.URL("http://127.0.0.1:$PORT/health")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 2000
+                connection.readTimeout = 2000
+                connection.requestMethod = "GET"
+                
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    Log.d(TAG, "[TEST] ✅ Teste local bem-sucedido! Servidor respondendo na porta $PORT")
+                } else {
+                    Log.w(TAG, "[TEST] ⚠️ Teste local retornou código: $responseCode")
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "[TEST] ❌ Teste local falhou: ${e.message}", e)
             }
         }
     }
