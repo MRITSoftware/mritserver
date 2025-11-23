@@ -23,8 +23,8 @@ class TuyaClient(private val context: Context? = null) {
         private const val DEFAULT_PROTOCOL_VERSION = 3.4 // Padrão 3.4
         private const val PORT = 6668 // Porta para comandos
         private const val DISCOVERY_PORT = 6666 // Porta para descoberta
-        private const val TIMEOUT_MS = 5000 // Timeout de 5s para dar tempo do dispositivo responder
-        private const val DISCOVERY_TIMEOUT_MS = 5000 // 5s para descoberta
+        private const val TIMEOUT_MS = 8000 // Timeout de 8s para dar tempo do dispositivo responder
+        private const val DISCOVERY_TIMEOUT_MS = 10000 // 10s para descoberta (dispositivos podem demorar para responder)
     }
     
     /**
@@ -93,11 +93,11 @@ class TuyaClient(private val context: Context? = null) {
             var success = false
             val otherProtocol = if (protocolVersion == 3.3) 3.4 else 3.3
             
-            // Tentativa 1: Protocolo informado pelo usuário, formato numérico
+            // Tentativa 1: Protocolo informado, formato numérico, sequence=0
             log("[INFO] Tentativa 1: Protocolo $protocolVersion (informado), formato numérico, sequence=0")
             var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = true)
-            for (attempt in 1..2) {
-                log("[INFO] Enviando tentativa $attempt de 2 com protocolo $protocolVersion")
+            for (attempt in 1..3) {
+                log("[INFO] Enviando tentativa $attempt de 3 com protocolo $protocolVersion")
                 val response = sendUdpPacket(lanIp, PORT, payload)
                 lastResponse = response
                 if (response != null && response.isNotEmpty()) {
@@ -105,15 +105,32 @@ class TuyaClient(private val context: Context? = null) {
                     success = true
                     break
                 }
-                if (attempt < 2) kotlinx.coroutines.delay(200)
+                if (attempt < 3) kotlinx.coroutines.delay(300)
+            }
+            
+            // Tentativa 1.5: Protocolo 3.4 com timestamp no sequence (se for 3.4)
+            if (!success && protocolVersion >= 3.4) {
+                log("[INFO] Tentativa 1.5: Protocolo $protocolVersion, formato numérico, sequence=timestamp")
+                payload = buildCommandPayload(commandNumeric, localKey, protocolVersion, sequenceZero = false)
+                for (attempt in 1..2) {
+                    log("[INFO] Enviando tentativa $attempt de 2 com protocolo $protocolVersion e timestamp no sequence")
+                    val response = sendUdpPacket(lanIp, PORT, payload)
+                    lastResponse = response
+                    if (response != null && response.isNotEmpty()) {
+                        log("[DEBUG] ✅ Resposta recebida com protocolo $protocolVersion e timestamp!")
+                        success = true
+                        break
+                    }
+                    if (attempt < 2) kotlinx.coroutines.delay(300)
+                }
             }
             
             // Tentativa 2: Outro protocolo (3.3 ou 3.4), formato numérico
             if (!success) {
                 log("[INFO] Tentativa 2: Protocolo $otherProtocol (alternativo), formato numérico, sequence=0")
                 payload = buildCommandPayload(commandNumeric, localKey, otherProtocol, sequenceZero = true)
-                for (attempt in 1..2) {
-                    log("[INFO] Enviando tentativa $attempt de 2 com protocolo $otherProtocol")
+                for (attempt in 1..3) {
+                    log("[INFO] Enviando tentativa $attempt de 3 com protocolo $otherProtocol")
                     val response = sendUdpPacket(lanIp, PORT, payload)
                     lastResponse = response
                     if (response != null && response.isNotEmpty()) {
@@ -121,7 +138,7 @@ class TuyaClient(private val context: Context? = null) {
                         success = true
                         break
                     }
-                    if (attempt < 2) kotlinx.coroutines.delay(200)
+                    if (attempt < 3) kotlinx.coroutines.delay(300)
                 }
             }
             
@@ -218,14 +235,16 @@ class TuyaClient(private val context: Context? = null) {
         // Protocolo 3.4: version = 0x00000000 (mesmo valor, mas pode ter diferenças no payload)
         val protocolVersionInt = 0x00000000
         
-        // Sequence number: muitos dispositivos Tuya precisam de sequence = 0
-        val sequence = if (sequenceZero) {
-            0x00000000 // Usa 0 (mais comum)
-        } else if (protocolVersion >= 3.4) {
-            timestamp // Usa timestamp (menos comum)
-        } else {
-            0x00000000
-        }
+            // Sequence number: 
+            // Protocolo 3.3: geralmente usa 0
+            // Protocolo 3.4: pode usar timestamp ou 0, dependendo do dispositivo
+            val sequence = if (sequenceZero) {
+                0x00000000 // Usa 0 (mais comum)
+            } else if (protocolVersion >= 3.4) {
+                timestamp // Usa timestamp para 3.4 quando sequenceZero = false
+            } else {
+                0x00000000
+            }
         
         log("[DEBUG] ========================================")
         log("[DEBUG] PROTOCOLO TUYA $protocolVersion")
@@ -437,17 +456,22 @@ class TuyaClient(private val context: Context? = null) {
                 reuseAddress = true // Permite reutilizar endereço
             }
             
-            // Pacote de descoberta Tuya (formato simplificado)
+            // Pacote de descoberta Tuya
+            // Formato: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) + suffix(4) = 28 bytes
             // Prefix: 0x000055AA, Command: 0x0000000A (DISCOVERY), Version: 0x00000000
-            val discoveryPacket = ByteBuffer.allocate(20).apply {
+            val discoveryPacket = ByteBuffer.allocate(28).apply {
                 order(ByteOrder.BIG_ENDIAN)
                 putInt(0x000055AA) // prefix
                 putInt(0x00000000) // version
                 putInt(0x0000000A) // command (0x0A = DISCOVERY)
                 putInt(0x00000000) // length (0 para descoberta)
                 putInt(0x00000000) // sequence
+                putInt(0x00000000) // return code
                 putInt(0x0000AA55) // suffix
             }.array()
+            
+            log("[DISCOVERY] Pacote de descoberta criado: ${discoveryPacket.size} bytes")
+            log("[DISCOVERY] Hex do pacote: ${discoveryPacket.joinToString(" ") { "%02X".format(it) }}")
             
             log("[DISCOVERY] Enviando pacote de descoberta (broadcast)...")
             
@@ -474,15 +498,21 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             log("[DISCOVERY] Aguardando respostas (timeout: ${DISCOVERY_TIMEOUT_MS}ms)...")
+            log("[DISCOVERY] Escutando na porta ${socket.localPort}")
             
             // Recebe respostas até o timeout
             val startTime = System.currentTimeMillis()
+            var lastReceiveTime = startTime
             while (System.currentTimeMillis() - startTime < DISCOVERY_TIMEOUT_MS) {
                 try {
+                    val remainingTime = DISCOVERY_TIMEOUT_MS - (System.currentTimeMillis() - startTime)
+                    if (remainingTime <= 0) break
+                    
                     val buffer = ByteArray(1024)
                     val responsePacket = DatagramPacket(buffer, buffer.size)
-                    socket.soTimeout = (DISCOVERY_TIMEOUT_MS - (System.currentTimeMillis() - startTime)).toInt().coerceAtLeast(100)
+                    socket.soTimeout = remainingTime.coerceAtLeast(500) // Mínimo 500ms
                     socket.receive(responsePacket)
+                    lastReceiveTime = System.currentTimeMillis()
                     
                     val deviceIp = responsePacket.address.hostAddress ?: continue
                     log("[DISCOVERY] Resposta recebida de $deviceIp: ${responsePacket.length} bytes")
@@ -490,6 +520,8 @@ class TuyaClient(private val context: Context? = null) {
                     // Tenta extrair Device ID da resposta
                     val deviceId = extractDeviceIdFromResponse(buffer, responsePacket.length)
                     
+                    // Adiciona dispositivo mesmo se não conseguir extrair Device ID
+                    // O IP é suficiente para enviar comandos
                     if (deviceId != null && deviceId != "unknown") {
                         log("[DISCOVERY] ✅ Dispositivo encontrado: $deviceId @ $deviceIp")
                         devices.add(DiscoveredDevice(
@@ -497,7 +529,14 @@ class TuyaClient(private val context: Context? = null) {
                             ip = deviceIp
                         ))
                     } else {
-                        log("[DISCOVERY] ⚠️ Resposta recebida mas Device ID não identificado de $deviceIp")
+                        // Gera um Device ID temporário baseado no IP para permitir uso
+                        val tempDeviceId = deviceIp.replace(".", "").take(16).padEnd(16, '0')
+                        log("[DISCOVERY] ⚠️ Device ID não identificado, usando temporário: $tempDeviceId @ $deviceIp")
+                        log("[DISCOVERY] ✅ Dispositivo Tuya encontrado (sem Device ID): $deviceIp")
+                        devices.add(DiscoveredDevice(
+                            deviceId = tempDeviceId,
+                            ip = deviceIp
+                        ))
                     }
                 } catch (e: java.net.SocketTimeoutException) {
                     // Timeout esperado quando não há mais respostas
@@ -553,33 +592,72 @@ class TuyaClient(private val context: Context? = null) {
      */
     private fun extractDeviceIdFromResponse(data: ByteArray, length: Int): String? {
         try {
-            // Tenta encontrar padrões comuns de Device ID (geralmente hex de 16 bytes = 32 chars)
-            // Device ID geralmente está no payload após o header de 24 bytes
-            if (length < 24) return null
+            log("[DISCOVERY] Tentando extrair Device ID de ${length} bytes")
+            log("[DISCOVERY] Primeiros 64 bytes: ${data.take(64).joinToString(" ") { "%02X".format(it) }}")
+            
+            // Header Tuya tem 24 bytes: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4)
+            if (length < 24) {
+                log("[DISCOVERY] Resposta muito curta (${length} bytes), mínimo 24 bytes")
+                return null
+            }
+            
+            // Verifica se é um pacote Tuya válido
+            val prefix = (data[0].toInt() shl 24) or (data[1].toInt() shl 16) or (data[2].toInt() shl 8) or data[3].toInt()
+            if (prefix != 0x000055AA) {
+                log("[DISCOVERY] Prefix inválido: 0x${prefix.toString(16)}")
+                return null
+            }
             
             // Pula o header (24 bytes) e tenta ler o payload
             val payloadStart = 24
-            if (length <= payloadStart) return null
-            
-            // Tenta decodificar como string (alguns dispositivos enviam Device ID como string)
-            val payload = data.sliceArray(payloadStart until length)
-            val payloadString = String(payload, Charsets.UTF_8).trim()
-            
-            // Procura por padrão de Device ID (geralmente hex de 16-32 caracteres)
-            val deviceIdPattern = Regex("[0-9a-fA-F]{16,32}")
-            val match = deviceIdPattern.find(payloadString)
-            if (match != null) {
-                return match.value.lowercase()
+            if (length <= payloadStart) {
+                log("[DISCOVERY] Sem payload após header")
+                return null
             }
             
-            // Se não encontrou, tenta ler os primeiros bytes do payload como hex
+            val payload = data.sliceArray(payloadStart until length)
+            log("[DISCOVERY] Payload: ${payload.size} bytes")
+            log("[DISCOVERY] Payload hex: ${payload.take(64).joinToString(" ") { "%02X".format(it) }}")
+            
+            // Tenta decodificar como string (alguns dispositivos enviam Device ID como string)
+            try {
+                val payloadString = String(payload, Charsets.UTF_8).trim()
+                log("[DISCOVERY] Payload como string: $payloadString")
+                
+                // Procura por padrão de Device ID (geralmente hex de 16-32 caracteres)
+                val deviceIdPattern = Regex("[0-9a-fA-F]{16,32}")
+                val match = deviceIdPattern.find(payloadString)
+                if (match != null) {
+                    log("[DISCOVERY] ✅ Device ID encontrado via regex: ${match.value.lowercase()}")
+                    return match.value.lowercase()
+                }
+            } catch (e: Exception) {
+                log("[DISCOVERY] Payload não é string válida: ${e.message}")
+            }
+            
+            // Se não encontrou como string, tenta ler os primeiros bytes do payload como hex
+            // Device ID geralmente tem 16 bytes (32 caracteres hex)
             if (payload.size >= 16) {
                 val hexId = payload.take(16).joinToString("") { "%02x".format(it) }
+                log("[DISCOVERY] ✅ Device ID extraído como hex: $hexId")
                 return hexId
+            }
+            
+            // Tenta ler como JSON se o payload for grande o suficiente
+            if (payload.size > 20) {
+                try {
+                    val jsonString = String(payload, Charsets.UTF_8)
+                    log("[DISCOVERY] Tentando parsear como JSON: $jsonString")
+                    // Se for JSON, pode ter o device ID em algum campo
+                    // Por enquanto, retorna null e deixa o dispositivo ser adicionado com IP
+                } catch (e: Exception) {
+                    // Não é JSON válido
+                }
             }
             
         } catch (e: Exception) {
             log("[DISCOVERY] Erro ao extrair Device ID: ${e.message}")
+            e.printStackTrace()
         }
         
         return null
@@ -598,14 +676,15 @@ class TuyaClient(private val context: Context? = null) {
                 broadcast = false
             }
             
-            // Pacote de descoberta Tuya
-            val discoveryPacket = ByteBuffer.allocate(20).apply {
+            // Pacote de descoberta Tuya (formato completo com 28 bytes)
+            val discoveryPacket = ByteBuffer.allocate(28).apply {
                 order(ByteOrder.BIG_ENDIAN)
                 putInt(0x000055AA) // prefix
                 putInt(0x00000000) // version
                 putInt(0x0000000A) // command (0x0A = DISCOVERY)
                 putInt(0x00000000) // length
                 putInt(0x00000000) // sequence
+                putInt(0x00000000) // return code
                 putInt(0x0000AA55) // suffix
             }.array()
             
