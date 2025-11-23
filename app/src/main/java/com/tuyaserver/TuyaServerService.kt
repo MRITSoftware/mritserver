@@ -117,6 +117,7 @@ class TuyaServerService : Service() {
         serviceScope.launch(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Iniciando servidor HTTP na porta $PORT...")
+                Log.d(TAG, "Host: 0.0.0.0 (aceita conexões de qualquer interface)")
                 
                 server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
                     install(ContentNegotiation) {
@@ -129,15 +130,19 @@ class TuyaServerService : Service() {
                     
                     routing {
                         get("/health") {
+                            Log.d(TAG, "[HTTP] GET /health recebido")
                             call.respond(
                                 HttpStatusCode.OK,
                                 HealthResponse(status = "ok", site = getSiteName())
                             )
+                            Log.d(TAG, "[HTTP] GET /health respondido com sucesso")
                         }
                         
                         post("/tuya/command") {
                             try {
+                                Log.d(TAG, "[HTTP] POST /tuya/command recebido")
                                 val request = call.receive<TuyaCommandRequest>()
+                                Log.d(TAG, "[HTTP] Request recebido: action=${request.action}, protocol=${request.protocol_version}")
                                 
                                 val action = request.action
                                 if (action == null || action !in listOf("on", "off")) {
@@ -151,7 +156,7 @@ class TuyaServerService : Service() {
                                     return@post
                                 }
                                 
-                                val protocolVersion = request.protocol_version ?: 3.3
+                                val protocolVersion = request.protocol_version ?: 3.4 // Padrão 3.4
                                 
                                 // Valida versão do protocolo
                                 if (protocolVersion != 3.3 && protocolVersion != 3.4) {
@@ -165,6 +170,8 @@ class TuyaServerService : Service() {
                                     return@post
                                 }
                                 
+                                Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo $protocolVersion")
+                                
                                 val result = tuyaClient.sendCommand(
                                     action = action,
                                     deviceId = request.tuya_device_id ?: "",
@@ -174,6 +181,7 @@ class TuyaServerService : Service() {
                                 )
                                 
                                 if (result.isSuccess) {
+                                    Log.d(TAG, "[HTTP] Comando Tuya enviado com sucesso")
                                     call.respond(
                                         HttpStatusCode.OK,
                                         TuyaCommandResponse(ok = true, error = null)

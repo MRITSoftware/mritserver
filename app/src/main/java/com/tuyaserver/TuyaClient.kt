@@ -16,7 +16,7 @@ class TuyaClient {
     
     companion object {
         private const val TAG = "TuyaClient"
-        private const val DEFAULT_PROTOCOL_VERSION = 3.3
+        private const val DEFAULT_PROTOCOL_VERSION = 3.4 // Padrão 3.4
         private const val PORT = 6668
         private const val TIMEOUT_MS = 5000
     }
@@ -93,10 +93,11 @@ class TuyaClient {
         val totalSize = headerSize + encrypted.size + suffixSize
         
         // Determina versão do protocolo no header
-        val protocolVersionInt = when {
-            protocolVersion >= 3.4 -> 0x00000000 // 3.4 também usa 0 no header
-            else -> 0x00000000 // 3.3 usa 0
-        }
+        // Protocolo 3.3: version = 0x00000000
+        // Protocolo 3.4: version = 0x00000000 (mesmo valor, mas pode ter diferenças no payload)
+        val protocolVersionInt = 0x00000000
+        
+        log("[DEBUG] Protocolo Tuya $protocolVersion - Header version: 0x${protocolVersionInt.toString(16)}")
         
         val packet = ByteBuffer.allocate(totalSize).apply {
             order(ByteOrder.BIG_ENDIAN)
