@@ -219,10 +219,10 @@ class TuyaServerService : Service() {
                         } catch (e: Exception) {
                             Log.e(TAG, "[HTTP] Erro ao responder /health", e)
                             e.printStackTrace()
-                            val errorResponse = TuyaCommandResponse(ok = false, error = "Erro interno: ${e.message}")
-                            val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
-                            val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
-                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            // Retorna erro simples em texto para evitar problemas de serialização
+                            val errorMsg = "Erro interno: ${e.message ?: "Desconhecido"}"
+                            val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", errorMsg)
+                            response.addHeader("Content-Type", "text/plain; charset=utf-8")
                             response
                         }
                     }
