@@ -68,8 +68,9 @@ class TuyaClient(private val context: Context? = null) {
             log("[INFO] ENVIANDO COMANDO TUYA")
             log("[INFO] Device ID: $deviceId")
             log("[INFO] LAN IP: $lanIp")
+            log("[INFO] ⚠️ VERIFIQUE: O IP está correto? No Python você usou 192.168.0.193")
             log("[INFO] Protocolo: $protocolVersion ${if (protocolVersion >= 3.4) "(3.4 - com timestamp)" else "(3.3)"}")
-            log("[INFO] Ação: $action (sempre 'on' = ligar)")
+            log("[INFO] Ação: $action")
             log("[INFO] Porta UDP: $PORT")
             log("[INFO] ========================================")
             
@@ -264,13 +265,13 @@ class TuyaClient(private val context: Context? = null) {
         val packetArray = packet.array()
         log("[DEBUG] Pacote completo: ${packetArray.size} bytes")
         log("[DEBUG] Header completo (24 bytes): ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (deve ser: 55 AA 00 00)")
+        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (little-endian: AA 55 00 00 = 0x000055AA)")
         log("[DEBUG] Version: ${packetArray.slice(4..7).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (deve ser: 00 00 00 0D)")
-        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes)")
-        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }}")
+        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (little-endian: 0D 00 00 00 = 0x0000000D)")
+        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes, little-endian)")
+        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }} (little-endian)")
         log("[DEBUG] Return code: ${packetArray.slice(20..23).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (deve ser: AA 55 00 00)")
+        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (little-endian: 55 AA 00 00 = 0x0000AA55)")
         
         return packetArray
     }
