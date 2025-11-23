@@ -63,12 +63,14 @@ cd mritserver
 
 ### 📱 Usar o App no Dispositivo
 
-1. Baixe o APK gerado (do Codespaces ou GitHub Actions)
-2. Instale no dispositivo Android (permita instalação de fontes desconhecidas)
-3. Na primeira execução, clique em "Configurar Site" e digite o nome (ex: `GELAFIT_SP01`)
-4. Clique em "Iniciar Servidor" para iniciar o servidor HTTP na porta 8000
-5. O servidor ficará rodando em background mesmo se fechar o app
-6. Para parar, abra o app novamente e clique em "Parar Servidor"
+1. **Baixe o APK gerado** (do Codespaces ou GitHub Actions)
+2. **Instale no dispositivo Android** (permita instalação de fontes desconhecidas)
+3. **Configure o site:** Na primeira execução, clique em "Configurar Site" e digite o nome (ex: `GELAFIT_SP01`)
+4. **Inicie o servidor:** Clique em "Iniciar Servidor" - deve aparecer uma notificação permanente
+5. **Descubra o IP:** Vá em Configurações → Sobre o telefone → Endereço IP
+6. **Teste:** Acesse `http://[IP_DO_DISPOSITIVO]:8000/health` no navegador ou use curl/Postman
+
+📖 **Guia completo de testes:** Veja [TESTE.md](TESTE.md) para instruções detalhadas!
 
 ## API
 
