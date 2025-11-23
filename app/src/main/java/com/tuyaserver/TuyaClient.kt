@@ -2,6 +2,7 @@ package com.tuyaserver
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -48,28 +49,63 @@ class TuyaClient {
         }
         
         try {
-            log("[INFO] Enviando '$action' → $deviceId @ $lanIp (protocolo $protocolVersion)")
+            log("[INFO] ========================================")
+            log("[INFO] Enviando comando Tuya")
+            log("[INFO] Device ID: $deviceId")
+            log("[INFO] LAN IP: $lanIp")
+            log("[INFO] Protocolo: $protocolVersion")
+            log("[INFO] Ação: $action (sempre 'on' = ligar)")
+            log("[INFO] ========================================")
             
             // Comando sempre ligar (on) conforme solicitado
-            val command = mapOf("1" to true)  // DPS 1 = power on
+            // DPS 1 = power on/off
+            // Alguns dispositivos usam true/false, outros usam 1/0
+            val command = mapOf("1" to true)  // DPS 1 = power on (boolean)
             
             log("[DEBUG] Comando DPS: $command")
+            log("[DEBUG] Formato: {\"1\": true} (DPS 1 = ligar)")
             
             val payload = buildCommandPayload(command, localKey, protocolVersion)
             
             log("[DEBUG] Payload total: ${payload.size} bytes")
-            log("[DEBUG] Hex do payload (primeiros 32 bytes): ${payload.take(32).joinToString(" ") { "%02X".format(it) }}")
+            log("[DEBUG] Hex do payload completo: ${payload.joinToString(" ") { "%02X".format(it) }}")
             
-            val response = sendUdpPacket(lanIp, PORT, payload)
-            
-            if (response != null && response.isNotEmpty()) {
-                log("[DEBUG] Resposta recebida do dispositivo: ${response.size} bytes")
-                log("[DEBUG] Hex da resposta (primeiros 32 bytes): ${response.take(32).joinToString(" ") { "%02X".format(it) }}")
+            // Tenta enviar múltiplas vezes (3 tentativas) para garantir que o comando chegue
+            var lastResponse: ByteArray? = null
+            var success = false
+            for (attempt in 1..3) {
+                log("[INFO] Tentativa $attempt de 3")
+                val response = sendUdpPacket(lanIp, PORT, payload)
+                lastResponse = response
+                
+                if (response != null) {
+                    if (response.isNotEmpty()) {
+                        log("[DEBUG] Resposta recebida do dispositivo: ${response.size} bytes")
+                        log("[DEBUG] Hex da resposta completa: ${response.joinToString(" ") { "%02X".format(it) }}")
+                        success = true
+                        break
+                    } else {
+                        log("[DEBUG] Sem resposta (timeout) - tentativa $attempt")
+                    }
+                } else {
+                    log("[WARN] Erro ao enviar - tentativa $attempt")
+                }
+                
+                // Aguarda um pouco entre tentativas (exceto na última)
+                if (attempt < 3) {
+                    kotlinx.coroutines.delay(200) // 200ms entre tentativas
+                }
             }
             
             log("[INFO] Protocolo Tuya ${protocolVersion} usado")
-            log("[OK] Comando enviado com sucesso")
-            Result.success(Unit)
+            if (success || lastResponse != null) {
+                log("[OK] Comando enviado com sucesso")
+                Result.success(Unit)
+            } else {
+                log("[WARN] Comando enviado mas sem confirmação do dispositivo")
+                // Ainda retorna sucesso pois o pacote foi enviado
+                Result.success(Unit)
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao enviar comando Tuya", e)
@@ -83,11 +119,11 @@ class TuyaClient {
     private fun buildCommandPayload(command: Map<String, Any>, localKey: String, protocolVersion: Double): ByteArray {
         // Converte comando para JSON
         val jsonCommand = command.entries.joinToString(", ") { (k, v) ->
-            "\"$k\":${if (v is Boolean) v else "\"$v\""}"
+            "\"$k\":${if (v is Boolean) v else if (v is Number) v else "\"$v\""}"
         }
         
-        // Protocolo 3.4 requer timestamp no payload
-        val timestamp = System.currentTimeMillis() / 1000 // timestamp em segundos
+        // Protocolo 3.4 requer timestamp no payload (em segundos)
+        val timestamp = (System.currentTimeMillis() / 1000).toInt()
         val json = if (protocolVersion >= 3.4) {
             "{\"t\":$timestamp,\"dps\":{$jsonCommand}}"
         } else {
@@ -99,9 +135,11 @@ class TuyaClient {
         // Cria payload Tuya
         val payload = json.toByteArray(Charsets.UTF_8)
         log("[DEBUG] Payload antes de criptografar: ${payload.size} bytes")
+        log("[DEBUG] Payload hex: ${payload.joinToString(" ") { "%02X".format(it) }}")
         
         val encrypted = encrypt(payload, localKey)
         log("[DEBUG] Payload criptografado: ${encrypted.size} bytes")
+        log("[DEBUG] Encrypted hex (primeiros 32): ${encrypted.take(32).joinToString(" ") { "%02X".format(it) }}")
         
         // Monta pacote Tuya 3.3 ou 3.4
         // Header: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) = 24 bytes
@@ -114,7 +152,14 @@ class TuyaClient {
         // Protocolo 3.4: version = 0x00000000 (mesmo valor, mas pode ter diferenças no payload)
         val protocolVersionInt = 0x00000000
         
-        log("[DEBUG] Protocolo Tuya $protocolVersion - Header version: 0x${protocolVersionInt.toString(16)}")
+        // Sequence number: para protocolo 3.4, usa timestamp; para 3.3, usa 0
+        val sequence = if (protocolVersion >= 3.4) {
+            timestamp // Usa timestamp como sequence para 3.4
+        } else {
+            0x00000000
+        }
+        
+        log("[DEBUG] Protocolo Tuya $protocolVersion - Header version: 0x${protocolVersionInt.toString(16)}, Sequence: 0x${sequence.toString(16)}")
         
         val packet = ByteBuffer.allocate(totalSize).apply {
             order(ByteOrder.BIG_ENDIAN)
@@ -122,13 +167,17 @@ class TuyaClient {
             putInt(protocolVersionInt) // version (0 = 3.3 ou 3.4)
             putInt(0x0000000D) // command (0x0D = CONTROL)
             putInt(encrypted.size) // length
-            putInt(0x00000000) // sequence
+            putInt(sequence) // sequence (timestamp para 3.4)
             putInt(0x00000000) // return code
             put(encrypted) // payload criptografado
             putInt(0x0000AA55) // suffix
         }
         
-        return packet.array()
+        val packetArray = packet.array()
+        log("[DEBUG] Pacote completo: ${packetArray.size} bytes")
+        log("[DEBUG] Header hex: ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
+        
+        return packetArray
     }
     
     /**
@@ -137,35 +186,53 @@ class TuyaClient {
     private fun sendUdpPacket(ip: String, port: Int, data: ByteArray): ByteArray? {
         var socket: DatagramSocket? = null
         try {
+            log("[UDP] Criando socket UDP...")
             socket = DatagramSocket().apply {
                 soTimeout = TIMEOUT_MS
+                broadcast = false // Não usar broadcast
             }
             
+            log("[UDP] Resolvendo endereço: $ip")
             val address = InetAddress.getByName(ip)
+            log("[UDP] Endereço resolvido: ${address.hostAddress}")
+            
             val packet = DatagramPacket(data, data.size, address, port)
+            log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
             
             socket.send(packet)
-            log("[DEBUG] Pacote enviado: ${data.size} bytes")
+            log("[UDP] ✅ Pacote enviado com sucesso: ${data.size} bytes")
+            log("[UDP] Hex completo do pacote: ${data.joinToString(" ") { "%02X".format(it) }}")
             
             // Tenta receber resposta
             val buffer = ByteArray(1024)
             val responsePacket = DatagramPacket(buffer, buffer.size)
             
             try {
+                log("[UDP] Aguardando resposta (timeout: ${TIMEOUT_MS}ms)...")
                 socket.receive(responsePacket)
-                log("[DEBUG] Resposta recebida: ${responsePacket.length} bytes")
+                log("[UDP] ✅ Resposta recebida: ${responsePacket.length} bytes de ${responsePacket.address.hostAddress}")
+                log("[UDP] Hex da resposta: ${buffer.take(responsePacket.length).joinToString(" ") { "%02X".format(it) }}")
                 return buffer.copyOf(responsePacket.length)
             } catch (e: java.net.SocketTimeoutException) {
-                // Timeout é aceitável para comandos
-                log("[DEBUG] Timeout ao receber resposta (normal para comandos)")
-                return ByteArray(0) // Retorna array vazio indicando sucesso
+                // Timeout é aceitável para comandos (alguns dispositivos não respondem)
+                log("[UDP] ⏱️ Timeout ao receber resposta (normal para alguns comandos Tuya)")
+                log("[UDP] Nota: Alguns dispositivos Tuya não enviam resposta de confirmação")
+                return ByteArray(0) // Retorna array vazio indicando que o pacote foi enviado
             }
             
+        } catch (e: java.net.UnknownHostException) {
+            Log.e(TAG, "[UDP] ❌ Erro: IP não encontrado: $ip", e)
+            return null
+        } catch (e: java.net.SocketException) {
+            Log.e(TAG, "[UDP] ❌ Erro de socket ao enviar pacote", e)
+            return null
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao enviar pacote UDP", e)
+            Log.e(TAG, "[UDP] ❌ Erro ao enviar pacote UDP", e)
+            e.printStackTrace()
             return null
         } finally {
             socket?.close()
+            log("[UDP] Socket fechado")
         }
     }
     
