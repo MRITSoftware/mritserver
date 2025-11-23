@@ -12,10 +12,27 @@ Servidor HTTP Android para controlar dispositivos Tuya localmente, convertido do
 
 ## Como Usar
 
-1. Abra o projeto no Android Studio
-2. Configure o nome do site através do botão "Configurar Site" na primeira execução
-3. Clique em "Iniciar Servidor" para iniciar o servidor HTTP na porta 8000
-4. O servidor ficará rodando em background mesmo se fechar o app
+### Clonar o Repositório
+
+```bash
+git clone https://github.com/MRITSoftware/mritserver.git
+cd mritserver
+```
+
+### Configurar no Android Studio
+
+1. Abra o Android Studio
+2. Selecione "Open" e escolha a pasta `mritserver`
+3. Aguarde o Gradle sincronizar (baixar dependências)
+4. Conecte um dispositivo Android ou inicie um emulador
+5. Execute o app (Shift+F10 ou botão Run)
+
+### Usar o App
+
+1. Na primeira execução, clique em "Configurar Site" e digite o nome (ex: `GELAFIT_SP01`)
+2. Clique em "Iniciar Servidor" para iniciar o servidor HTTP na porta 8000
+3. O servidor ficará rodando em background mesmo se fechar o app
+4. Para parar, abra o app novamente e clique em "Parar Servidor"
 
 ## API
 
