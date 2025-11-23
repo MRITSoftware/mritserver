@@ -359,6 +359,7 @@ class TuyaServerService : Service() {
                         }
                         
                         Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo $protocolVersion")
+                        LogCollector.addLog(TAG, "[HTTP] Enviando comando Tuya: action=$action, IP=$lanIp, protocol=$protocolVersion", "I")
                         
                         // sendCommand é suspend, então precisa ser chamado dentro de runBlocking
                         val result = runBlocking {
@@ -373,6 +374,7 @@ class TuyaServerService : Service() {
                         
                         if (result.isSuccess) {
                             Log.d(TAG, "[HTTP] Comando Tuya enviado com sucesso")
+                            LogCollector.addLog(TAG, "[HTTP] ✅ Comando Tuya enviado com sucesso", "I")
                             val successResponse = TuyaCommandResponse(ok = true, error = null)
                             val jsonSuccess = json.encodeToString(serializer<TuyaCommandResponse>(), successResponse)
                             val response = newFixedLengthResponse(Response.Status.OK, "application/json", jsonSuccess)
@@ -381,6 +383,7 @@ class TuyaServerService : Service() {
                         } else {
                             val error = result.exceptionOrNull()?.message ?: "Erro desconhecido"
                             Log.e(TAG, "[HTTP] Erro ao enviar comando Tuya: $error")
+                            LogCollector.addLog(TAG, "[HTTP] ❌ Erro ao enviar comando Tuya: $error", "E")
                             val errorResponse = TuyaCommandResponse(ok = false, error = error)
                             val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                             val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
