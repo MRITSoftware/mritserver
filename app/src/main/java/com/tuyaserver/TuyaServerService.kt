@@ -92,7 +92,7 @@ class TuyaServerService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Tuya Server")
             .setContentText("Servidor rodando na porta $PORT")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
