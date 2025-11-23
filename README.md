@@ -90,9 +90,17 @@ Envia comando para dispositivo Tuya:
   "action": "on",
   "tuya_device_id": "bf1234567890abcdef",
   "local_key": "abc123def456",
-  "lan_ip": "192.168.1.100"
+  "lan_ip": "192.168.1.100",
+  "protocol_version": 3.3
 }
 ```
+
+**Parâmetros:**
+- `action` (obrigatório): "on" ou "off"
+- `tuya_device_id` (obrigatório): ID do dispositivo Tuya
+- `local_key` (obrigatório): Chave local do dispositivo
+- `lan_ip` (obrigatório): IP local do dispositivo na rede
+- `protocol_version` (opcional): Versão do protocolo Tuya (3.3 ou 3.4). Padrão: 3.3
 
 Resposta de sucesso:
 ```json
