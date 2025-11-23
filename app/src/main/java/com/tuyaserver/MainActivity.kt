@@ -52,6 +52,7 @@ class MainActivity : AppCompatActivity() {
         val stopButton: Button = findViewById(R.id.stopButton)
         val configButton: Button = findViewById(R.id.configButton)
         val tuyaCommandButton: Button = findViewById(R.id.tuyaCommandButton)
+        val logsButton: Button = findViewById(R.id.logsButton)
         
         // Configurar clique para copiar IP
         ipContainer.setOnClickListener {
@@ -550,7 +551,7 @@ class MainActivity : AppCompatActivity() {
                 logs
             }
             textSize = 10f
-            fontFamily = android.graphics.Typeface.MONOSPACE
+            typeface = android.graphics.Typeface.MONOSPACE
             setTextColor(android.graphics.Color.BLACK)
             setPadding(16, 16, 16, 16)
             background = android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)
@@ -603,7 +604,7 @@ class MainActivity : AppCompatActivity() {
                 logs
             }
             textSize = 10f
-            fontFamily = android.graphics.Typeface.MONOSPACE
+            typeface = android.graphics.Typeface.MONOSPACE
             setTextColor(android.graphics.Color.BLACK)
             setPadding(16, 16, 16, 16)
             background = android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)

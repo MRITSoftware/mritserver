@@ -359,6 +359,7 @@ class TuyaServerService : Service() {
                         }
                         
                         Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo $protocolVersion")
+                        val lanIp = request.lan_ip ?: ""
                         LogCollector.addLog(TAG, "[HTTP] Enviando comando Tuya: action=$action, IP=$lanIp, protocol=$protocolVersion", "I")
                         
                         // sendCommand é suspend, então precisa ser chamado dentro de runBlocking
