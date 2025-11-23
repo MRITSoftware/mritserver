@@ -34,13 +34,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var siteNameText: TextView
     private lateinit var ipText: TextView
     private lateinit var ipContainer: LinearLayout
-    private val tuyaClient = TuyaClient()
+    private lateinit var tuyaClient: TuyaClient
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
         configManager = ConfigManager(this)
+        tuyaClient = TuyaClient(this) // Passa o contexto para usar MulticastLock
         
         statusText = findViewById(R.id.statusText)
         siteNameText = findViewById(R.id.siteNameText)

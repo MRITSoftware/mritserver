@@ -1,5 +1,7 @@
 package com.tuyaserver
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -7,13 +9,14 @@ import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
 
-class TuyaClient {
+class TuyaClient(private val context: Context? = null) {
     
     companion object {
         private const val TAG = "TuyaClient"
@@ -264,19 +267,62 @@ class TuyaClient {
      */
     private fun sendUdpPacket(ip: String, port: Int, data: ByteArray): ByteArray? {
         var socket: DatagramSocket? = null
+        var multicastLock: WifiManager.MulticastLock? = null
+        
         try {
+            // No Android, pode precisar de MulticastLock mesmo para envio direto
+            if (context != null) {
+                try {
+                    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    multicastLock = wifiManager?.createMulticastLock("TuyaCommand")
+                    multicastLock?.setReferenceCounted(true)
+                    multicastLock?.acquire()
+                    log("[UDP] MulticastLock adquirido para envio")
+                } catch (e: Exception) {
+                    log("[UDP] ⚠️ Erro ao adquirir MulticastLock: ${e.message}")
+                }
+            }
+            
             log("[UDP] Criando socket UDP...")
             socket = DatagramSocket().apply {
                 soTimeout = TIMEOUT_MS
-                broadcast = false // Não usar broadcast
+                broadcast = false // Não usar broadcast para envio direto
+                reuseAddress = true // Permite reutilizar endereço
             }
             
             log("[UDP] Resolvendo endereço: $ip")
-            val address = InetAddress.getByName(ip)
+            val address = try {
+                InetAddress.getByName(ip)
+            } catch (e: Exception) {
+                log("[UDP] ❌ Erro ao resolver IP: ${e.message}")
+                return null
+            }
+            
+            if (address == null) {
+                log("[UDP] ❌ Endereço IP inválido: $ip")
+                return null
+            }
+            
             log("[UDP] Endereço resolvido: ${address.hostAddress}")
+            log("[UDP] Verificando se endereço é alcançável...")
+            
+            // Verifica se o endereço é alcançável (pode demorar, então fazemos timeout curto)
+            val isReachable = try {
+                address.isReachable(1000) // 1 segundo de timeout
+            } catch (e: Exception) {
+                log("[UDP] ⚠️ Não foi possível verificar se endereço é alcançável: ${e.message}")
+                true // Assume que é alcançável se não conseguir verificar
+            }
+            
+            if (!isReachable) {
+                log("[UDP] ⚠️ Endereço não parece ser alcançável, mas tentando enviar mesmo assim...")
+            } else {
+                log("[UDP] ✅ Endereço parece ser alcançável")
+            }
             
             val packet = DatagramPacket(data, data.size, address, port)
             log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
+            log("[UDP] Primeiros 32 bytes do pacote: ${data.take(32).joinToString(" ") { "%02X".format(it) }}")
             
             socket.send(packet)
             log("[UDP] ✅ Pacote enviado com sucesso: ${data.size} bytes")
@@ -301,17 +347,24 @@ class TuyaClient {
             
         } catch (e: java.net.UnknownHostException) {
             Log.e(TAG, "[UDP] ❌ Erro: IP não encontrado: $ip", e)
+            e.printStackTrace()
             return null
         } catch (e: java.net.SocketException) {
-            Log.e(TAG, "[UDP] ❌ Erro de socket ao enviar pacote", e)
+            Log.e(TAG, "[UDP] ❌ Erro de socket ao enviar pacote: ${e.message}", e)
+            e.printStackTrace()
+            return null
+        } catch (e: java.io.IOException) {
+            Log.e(TAG, "[UDP] ❌ Erro de IO ao enviar pacote: ${e.message}", e)
+            e.printStackTrace()
             return null
         } catch (e: Exception) {
-            Log.e(TAG, "[UDP] ❌ Erro ao enviar pacote UDP", e)
+            Log.e(TAG, "[UDP] ❌ Erro ao enviar pacote UDP: ${e.javaClass.simpleName}: ${e.message}", e)
             e.printStackTrace()
             return null
         } finally {
             socket?.close()
-            log("[UDP] Socket fechado")
+            multicastLock?.release()
+            log("[UDP] Socket fechado e MulticastLock liberado")
         }
     }
     
@@ -360,13 +413,28 @@ class TuyaClient {
     suspend fun discoverDevices(): List<DiscoveredDevice> = withContext(Dispatchers.IO) {
         val devices = mutableListOf<DiscoveredDevice>()
         var socket: DatagramSocket? = null
+        var multicastLock: WifiManager.MulticastLock? = null
         
         try {
             log("[DISCOVERY] Iniciando descoberta de dispositivos Tuya...")
             
+            // No Android, precisa de MulticastLock para broadcast UDP funcionar
+            if (context != null) {
+                try {
+                    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    multicastLock = wifiManager?.createMulticastLock("TuyaDiscovery")
+                    multicastLock?.setReferenceCounted(true)
+                    multicastLock?.acquire()
+                    log("[DISCOVERY] MulticastLock adquirido")
+                } catch (e: Exception) {
+                    log("[DISCOVERY] ⚠️ Erro ao adquirir MulticastLock: ${e.message}")
+                }
+            }
+            
             socket = DatagramSocket().apply {
                 soTimeout = DISCOVERY_TIMEOUT_MS
                 broadcast = true // Permite broadcast
+                reuseAddress = true // Permite reutilizar endereço
             }
             
             // Pacote de descoberta Tuya (formato simplificado)
@@ -382,9 +450,28 @@ class TuyaClient {
             }.array()
             
             log("[DISCOVERY] Enviando pacote de descoberta (broadcast)...")
-            val broadcastAddress = InetAddress.getByName("255.255.255.255")
-            val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, broadcastAddress, DISCOVERY_PORT)
-            socket.send(packet)
+            
+            // Tenta enviar para broadcast e também para IPs de rede local
+            try {
+                val broadcastAddress = InetAddress.getByName("255.255.255.255")
+                val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, broadcastAddress, DISCOVERY_PORT)
+                socket.send(packet)
+                log("[DISCOVERY] ✅ Pacote broadcast enviado para 255.255.255.255:$DISCOVERY_PORT")
+            } catch (e: Exception) {
+                log("[DISCOVERY] ⚠️ Erro ao enviar broadcast: ${e.message}")
+            }
+            
+            // Também tenta enviar para o endereço de broadcast da rede local
+            try {
+                val localBroadcast = getLocalBroadcastAddress()
+                if (localBroadcast != null) {
+                    val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, localBroadcast, DISCOVERY_PORT)
+                    socket.send(packet)
+                    log("[DISCOVERY] ✅ Pacote broadcast enviado para ${localBroadcast.hostAddress}:$DISCOVERY_PORT")
+                }
+            } catch (e: Exception) {
+                log("[DISCOVERY] ⚠️ Erro ao enviar para broadcast local: ${e.message}")
+            }
             
             log("[DISCOVERY] Aguardando respostas (timeout: ${DISCOVERY_TIMEOUT_MS}ms)...")
             
@@ -424,11 +511,40 @@ class TuyaClient {
             
         } catch (e: Exception) {
             Log.e(TAG, "[DISCOVERY] Erro na descoberta", e)
+            e.printStackTrace()
         } finally {
             socket?.close()
+            multicastLock?.release()
+            log("[DISCOVERY] MulticastLock liberado")
         }
         
         return@withContext devices
+    }
+    
+    /**
+     * Obtém o endereço de broadcast da rede local
+     */
+    private fun getLocalBroadcastAddress(): InetAddress? {
+        return try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val networkInterface = interfaces.nextElement()
+                if (!networkInterface.isLoopback && networkInterface.isUp) {
+                    val addresses = networkInterface.interfaceAddresses
+                    for (address in addresses) {
+                        val broadcast = address.broadcast
+                        if (broadcast != null) {
+                            log("[DISCOVERY] Broadcast local encontrado: ${broadcast.hostAddress}")
+                            return broadcast
+                        }
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            log("[DISCOVERY] Erro ao obter broadcast local: ${e.message}")
+            null
+        }
     }
     
     /**

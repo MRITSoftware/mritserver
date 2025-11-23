@@ -35,7 +35,7 @@ class TuyaServerService : Service() {
     private var httpServer: HttpServer? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var configManager: ConfigManager
-    private val tuyaClient = TuyaClient()
+    private lateinit var tuyaClient: TuyaClient
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     
     private fun getSiteName(): String {
@@ -65,6 +65,7 @@ class TuyaServerService : Service() {
         }
         
         configManager = ConfigManager(this)
+        tuyaClient = TuyaClient(this) // Passa o contexto para usar MulticastLock
         val siteName = getSiteName()
         
         Log.d(TAG, "[INFO] Servidor local iniciado para SITE = $siteName")
