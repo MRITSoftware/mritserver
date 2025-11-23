@@ -77,68 +77,52 @@ class TuyaClient {
             val commandNumeric = mapOf("1" to 1)  // DPS 1 = power on (numérico: 1 = ligar, 0 = desligar)
             val commandBoolean = mapOf("1" to true)  // DPS 1 = power on (booleano)
             
-            // Tenta múltiplas variações do protocolo para garantir compatibilidade
-            // Muitos dispositivos Tuya 3.4 precisam de sequence = 0, não timestamp
+            // Tenta múltiplas variações do protocolo, começando com 3.3 (como no Python)
             var lastResponse: ByteArray? = null
             var success = false
             
-            // Variação 1: Protocolo 3.4, formato numérico, sequence = 0 (MAIS COMUM)
-            log("[INFO] Tentativa 1: Protocolo 3.4, formato numérico, sequence=0")
-            var payload = buildCommandPayload(commandNumeric, localKey, 3.4, sequenceZero = true)
-            for (attempt in 1..3) {
-                log("[INFO] Enviando tentativa $attempt de 3")
+            // Variação 1: Protocolo 3.3, formato numérico, sequence = 0 (COMO NO PYTHON)
+            log("[INFO] Tentativa 1: Protocolo 3.3, formato numérico, sequence=0 (como no Python)")
+            var payload = buildCommandPayload(commandNumeric, localKey, 3.3, sequenceZero = true)
+            for (attempt in 1..2) {
+                log("[INFO] Enviando tentativa $attempt de 2")
                 val response = sendUdpPacket(lanIp, PORT, payload)
                 lastResponse = response
                 if (response != null && response.isNotEmpty()) {
-                    log("[DEBUG] ✅ Resposta recebida!")
+                    log("[DEBUG] ✅ Resposta recebida com protocolo 3.3!")
                     success = true
                     break
                 }
-                if (attempt < 3) kotlinx.coroutines.delay(300)
+                if (attempt < 2) kotlinx.coroutines.delay(200)
             }
             
-            // Variação 2: Protocolo 3.3, formato numérico, sequence = 0
+            // Variação 2: Protocolo 3.4, formato numérico, sequence = 0
             if (!success) {
-                log("[INFO] Tentativa 2: Protocolo 3.3, formato numérico, sequence=0")
-                payload = buildCommandPayload(commandNumeric, localKey, 3.3, sequenceZero = true)
-                for (attempt in 1..3) {
+                log("[INFO] Tentativa 2: Protocolo 3.4, formato numérico, sequence=0")
+                payload = buildCommandPayload(commandNumeric, localKey, 3.4, sequenceZero = true)
+                for (attempt in 1..2) {
                     val response = sendUdpPacket(lanIp, PORT, payload)
                     if (response != null && response.isNotEmpty()) {
-                        log("[DEBUG] ✅ Resposta recebida com protocolo 3.3!")
+                        log("[DEBUG] ✅ Resposta recebida com protocolo 3.4!")
                         success = true
                         break
                     }
-                    if (attempt < 3) kotlinx.coroutines.delay(300)
+                    if (attempt < 2) kotlinx.coroutines.delay(200)
                 }
             }
             
-            // Variação 3: Protocolo 3.4, formato booleano, sequence = 0
+            // Variação 3: Protocolo 3.3, formato booleano, sequence = 0
             if (!success) {
-                log("[INFO] Tentativa 3: Protocolo 3.4, formato booleano, sequence=0")
-                payload = buildCommandPayload(commandBoolean, localKey, 3.4, sequenceZero = true)
-                for (attempt in 1..3) {
+                log("[INFO] Tentativa 3: Protocolo 3.3, formato booleano, sequence=0")
+                payload = buildCommandPayload(commandBoolean, localKey, 3.3, sequenceZero = true)
+                for (attempt in 1..2) {
                     val response = sendUdpPacket(lanIp, PORT, payload)
                     if (response != null && response.isNotEmpty()) {
                         log("[DEBUG] ✅ Resposta recebida com formato booleano!")
                         success = true
                         break
                     }
-                    if (attempt < 3) kotlinx.coroutines.delay(300)
-                }
-            }
-            
-            // Variação 4: Protocolo 3.4, formato numérico, sequence = timestamp (menos comum)
-            if (!success) {
-                log("[INFO] Tentativa 4: Protocolo 3.4, formato numérico, sequence=timestamp")
-                payload = buildCommandPayload(commandNumeric, localKey, 3.4, sequenceZero = false)
-                for (attempt in 1..2) {
-                    val response = sendUdpPacket(lanIp, PORT, payload)
-                    if (response != null && response.isNotEmpty()) {
-                        log("[DEBUG] ✅ Resposta recebida com sequence=timestamp!")
-                        success = true
-                        break
-                    }
-                    if (attempt < 2) kotlinx.coroutines.delay(300)
+                    if (attempt < 2) kotlinx.coroutines.delay(200)
                 }
             }
             

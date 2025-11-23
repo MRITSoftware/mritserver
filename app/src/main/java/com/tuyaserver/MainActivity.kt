@@ -94,9 +94,9 @@ class MainActivity : AppCompatActivity() {
         val siteName = configManager.getSiteName()
         siteNameText.text = "Site: $siteName"
         
-        // Atualiza IP local (oculto)
+        // Atualiza IP local (mostra completo)
         val localIp = getLocalIpAddress()
-        ipText.text = maskIpAddress(localIp)
+        ipText.text = localIp
         
         // Verifica se o serviço está rodando
         val isRunning = isServiceRunning(TuyaServerService::class.java)
