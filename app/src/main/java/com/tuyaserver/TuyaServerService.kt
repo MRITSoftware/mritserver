@@ -72,10 +72,10 @@ class TuyaServerService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Tuya Server",
+                "MRIT Server",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Servidor HTTP Tuya rodando em background"
+                description = "Servidor HTTP MRIT rodando em background"
             }
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
@@ -90,7 +90,7 @@ class TuyaServerService : Service() {
         )
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Tuya Server")
+            .setContentTitle("MRIT Server")
             .setContentText("Servidor rodando na porta $PORT")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
@@ -101,8 +101,10 @@ class TuyaServerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     
     private fun startServer() {
-        serviceScope.launch {
+        serviceScope.launch(Dispatchers.IO) {
             try {
+                Log.d(TAG, "Iniciando servidor HTTP na porta $PORT...")
+                
                 server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
                     install(ContentNegotiation) {
                         json(Json {
@@ -169,10 +171,23 @@ class TuyaServerService : Service() {
                     }
                 }.start(wait = false)
                 
-                Log.d(TAG, "[START] Servidor Tuya local rodando em http://0.0.0.0:$PORT (SITE=${getSiteName()})")
+                Log.d(TAG, "[START] Servidor MRIT local rodando em http://0.0.0.0:$PORT (SITE=${getSiteName()})")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao iniciar servidor", e)
+                e.printStackTrace()
+                // Atualiza notificação com erro
+                try {
+                    val notification = NotificationCompat.Builder(this@TuyaServerService, CHANNEL_ID)
+                        .setContentTitle("MRIT Server - Erro")
+                        .setContentText("Falha ao iniciar: ${e.message}")
+                        .setSmallIcon(R.drawable.ic_notification)
+                        .setOngoing(false)
+                        .build()
+                    startForeground(NOTIFICATION_ID, notification)
+                } catch (ex: Exception) {
+                    Log.e(TAG, "Erro ao atualizar notificação", ex)
+                }
             }
         }
     }

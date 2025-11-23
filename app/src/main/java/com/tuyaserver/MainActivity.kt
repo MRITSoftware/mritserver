@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
     
@@ -42,9 +43,13 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     startService(intent)
                 }
-                updateUI()
+                // Aguarda um pouco antes de atualizar UI
+                statusText.postDelayed({
+                    updateUI()
+                }, 500)
             } catch (e: Exception) {
                 statusText.text = "Erro: ${e.message}"
+                android.util.Log.e("MainActivity", "Erro ao iniciar serviço", e)
             }
         }
         
@@ -68,10 +73,12 @@ class MainActivity : AppCompatActivity() {
         
         // Verifica se o serviço está rodando
         val isRunning = isServiceRunning(TuyaServerService::class.java)
-        statusText.text = if (isRunning) {
-            "Servidor: Rodando na porta 8000"
+        if (isRunning) {
+            statusText.text = "Servidor: Rodando na porta 8000"
+            statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark))
         } else {
-            "Servidor: Parado"
+            statusText.text = "Servidor: Parado"
+            statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
         }
     }
     
