@@ -16,19 +16,21 @@ class TuyaClient {
     
     companion object {
         private const val TAG = "TuyaClient"
-        private const val PROTOCOL_VERSION = 3.3
+        private const val DEFAULT_PROTOCOL_VERSION = 3.3
         private const val PORT = 6668
         private const val TIMEOUT_MS = 5000
     }
     
     /**
      * Envia comando para dispositivo Tuya
+     * @param protocolVersion Versão do protocolo (3.3 ou 3.4). Padrão: 3.3
      */
     suspend fun sendCommand(
         action: String,
         deviceId: String,
         localKey: String,
-        lanIp: String
+        lanIp: String,
+        protocolVersion: Double = DEFAULT_PROTOCOL_VERSION
     ): Result<Unit> = withContext(Dispatchers.IO) {
         
         if (deviceId.isBlank()) {
@@ -54,8 +56,10 @@ class TuyaClient {
                 mapOf("1" to false) // DPS 1 = power off
             }
             
-            val payload = buildCommandPayload(command, localKey)
+            val payload = buildCommandPayload(command, localKey, protocolVersion)
             sendUdpPacket(lanIp, PORT, payload)
+            
+            log("[INFO] Protocolo Tuya ${protocolVersion} usado")
             
             // Para comandos, não é necessário receber resposta confirmada
             // O envio bem-sucedido já indica que o comando foi processado
@@ -69,9 +73,9 @@ class TuyaClient {
     }
     
     /**
-     * Constrói o payload do comando Tuya (protocolo 3.3)
+     * Constrói o payload do comando Tuya (protocolo 3.3 ou 3.4)
      */
-    private fun buildCommandPayload(command: Map<String, Any>, localKey: String): ByteArray {
+    private fun buildCommandPayload(command: Map<String, Any>, localKey: String, protocolVersion: Double): ByteArray {
         // Converte comando para JSON
         val jsonCommand = command.entries.joinToString(", ") { (k, v) ->
             "\"$k\":${if (v is Boolean) v else "\"$v\""}"
@@ -82,16 +86,22 @@ class TuyaClient {
         val payload = json.toByteArray(Charsets.UTF_8)
         val encrypted = encrypt(payload, localKey)
         
-        // Monta pacote Tuya 3.3
+        // Monta pacote Tuya 3.3 ou 3.4
         // Header: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) = 24 bytes
         val headerSize = 24
         val suffixSize = 4
         val totalSize = headerSize + encrypted.size + suffixSize
         
+        // Determina versão do protocolo no header
+        val protocolVersionInt = when {
+            protocolVersion >= 3.4 -> 0x00000000 // 3.4 também usa 0 no header
+            else -> 0x00000000 // 3.3 usa 0
+        }
+        
         val packet = ByteBuffer.allocate(totalSize).apply {
             order(ByteOrder.BIG_ENDIAN)
             putInt(0x000055AA) // prefix
-            putInt(0x00000000) // version (0 = 3.3)
+            putInt(protocolVersionInt) // version (0 = 3.3 ou 3.4)
             putInt(0x0000000D) // command (0x0D = CONTROL)
             putInt(encrypted.size) // length
             putInt(0x00000000) // sequence

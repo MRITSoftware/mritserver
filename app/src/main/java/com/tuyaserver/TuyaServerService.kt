@@ -151,11 +151,26 @@ class TuyaServerService : Service() {
                                     return@post
                                 }
                                 
+                                val protocolVersion = request.protocol_version ?: 3.3
+                                
+                                // Valida versão do protocolo
+                                if (protocolVersion != 3.3 && protocolVersion != 3.4) {
+                                    call.respond(
+                                        HttpStatusCode.BadRequest,
+                                        TuyaCommandResponse(
+                                            ok = false,
+                                            error = "protocol_version deve ser 3.3 ou 3.4"
+                                        )
+                                    )
+                                    return@post
+                                }
+                                
                                 val result = tuyaClient.sendCommand(
                                     action = action,
                                     deviceId = request.tuya_device_id ?: "",
                                     localKey = request.local_key ?: "",
-                                    lanIp = request.lan_ip ?: ""
+                                    lanIp = request.lan_ip ?: "",
+                                    protocolVersion = protocolVersion
                                 )
                                 
                                 if (result.isSuccess) {
@@ -225,7 +240,8 @@ class TuyaServerService : Service() {
         val action: String? = null,
         val tuya_device_id: String? = null,
         val local_key: String? = null,
-        val lan_ip: String? = null
+        val lan_ip: String? = null,
+        val protocol_version: Double? = null // Opcional: 3.3 ou 3.4 (padrão: 3.3)
     )
     
     @Serializable
