@@ -250,18 +250,28 @@ class TuyaClient(private val context: Context? = null) {
         log("[DEBUG] Encrypted size: ${encrypted.size} bytes")
         log("[DEBUG] ========================================")
         
-        // Protocolo Tuya: alguns campos podem usar big-endian, outros little-endian
-        // Vamos tentar com BIG_ENDIAN primeiro (como muitos protocolos de rede usam)
+        // Protocolo Tuya: os bytes devem estar na ordem específica
+        // Prefix: 0x000055AA = [0x00, 0x00, 0x55, 0xAA] em big-endian
+        // Mas alguns protocolos Tuya esperam [0x55, 0xAA, 0x00, 0x00]
+        // Vamos criar manualmente para garantir a ordem correta
         val packet = ByteBuffer.allocate(totalSize).apply {
             order(ByteOrder.BIG_ENDIAN)
-            putInt(0x000055AA) // prefix (será escrito como 00 00 55 AA em big-endian)
-            putInt(protocolVersionInt) // version (0 = 3.3 ou 3.4)
-            putInt(0x0000000D) // command (0x0D = CONTROL)
-            putInt(encrypted.size) // length
-            putInt(sequence) // sequence (timestamp para 3.4)
-            putInt(0x00000000) // return code
-            put(encrypted) // payload criptografado
-            putInt(0x0000AA55) // suffix (será escrito como 00 00 AA 55 em big-endian)
+            // Prefix: 0x000055AA -> bytes: 00 00 55 AA
+            putInt(0x000055AA)
+            // Version: 0x00000000
+            putInt(protocolVersionInt)
+            // Command: 0x0000000D
+            putInt(0x0000000D)
+            // Length: tamanho do payload criptografado
+            putInt(encrypted.size)
+            // Sequence: timestamp ou 0
+            putInt(sequence)
+            // Return code: 0x00000000
+            putInt(0x00000000)
+            // Payload criptografado
+            put(encrypted)
+            // Suffix: 0x0000AA55 -> bytes: 00 00 AA 55
+            putInt(0x0000AA55)
         }
         
         val packetArray = packet.array()
