@@ -233,7 +233,7 @@ class MainActivity : AppCompatActivity() {
         // Ação sempre será "on" (ligar), não precisa de campo
         
         val deviceIdInput = EditText(this).apply {
-            hint = "Device ID"
+            hint = "Device ID do Tuya"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -243,7 +243,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         val localKeyInput = EditText(this).apply {
-            hint = "Local Key"
+            hint = "Local Key do Tuya"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -252,22 +252,30 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // IP sempre será o local, não precisa de campo
-        // Ação sempre será "on" (ligar), não precisa de campo
+        val lanIpInput = EditText(this).apply {
+            hint = "IP do dispositivo Tuya (ex: 192.168.1.100)"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        
         layout.addView(deviceIdInput)
         layout.addView(localKeyInput)
+        layout.addView(lanIpInput)
         
         AlertDialog.Builder(this)
             .setTitle("Comando Tuya - Ligar")
-            .setMessage("Preencha os dados do dispositivo:")
+            .setMessage("Preencha os dados do dispositivo Tuya:\n\n• Device ID: ID do dispositivo\n• Local Key: Chave local\n• IP: IP do dispositivo na rede")
             .setView(layout)
             .setPositiveButton("Enviar") { _, _ ->
                 val deviceId = deviceIdInput.text.toString().trim()
                 val localKey = localKeyInput.text.toString().trim()
+                val lanIp = lanIpInput.text.toString().trim()
                 
-                if (deviceId.isNotEmpty() && localKey.isNotEmpty()) {
-                    // Sempre usa IP local e ação "on"
-                    sendTuyaCommand("on", deviceId, localKey)
+                if (deviceId.isNotEmpty() && localKey.isNotEmpty() && lanIp.isNotEmpty()) {
+                    // Sempre usa ação "on"
+                    sendTuyaCommand("on", deviceId, localKey, lanIp)
                 } else {
                     Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show()
                 }
@@ -276,15 +284,15 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
     
-    private fun sendTuyaCommand(action: String, deviceId: String, localKey: String) {
+    private fun sendTuyaCommand(action: String, deviceId: String, localKey: String, lanIp: String) {
         val localIp = getLocalIpAddress()
         if (localIp == "Não disponível") {
             Toast.makeText(this, "IP não disponível", Toast.LENGTH_SHORT).show()
             return
         }
         
-        // Usa sempre o IP local como lan_ip
-        val lanIp = localIp
+        // lanIp é o IP do dispositivo Tuya (fornecido pelo usuário)
+        // localIp é o IP do Android (usado para conectar ao servidor HTTP)
         
         // Mostra loading
         Toast.makeText(this, "Enviando comando...", Toast.LENGTH_SHORT).show()
