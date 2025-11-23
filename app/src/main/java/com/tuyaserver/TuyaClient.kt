@@ -542,18 +542,45 @@ class TuyaClient(private val context: Context? = null) {
             
             // Pacote de descoberta Tuya
             // Formato: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) + suffix(4) = 28 bytes
-            // Prefix: 0x000055AA, Command: 0x0000000A (DISCOVERY), Version: 0x00000000
-            // Protocolo Tuya usa BIG_ENDIAN (padrão de rede)
-            val discoveryPacket = ByteBuffer.allocate(28).apply {
-                order(ByteOrder.BIG_ENDIAN)
-                putInt(0x000055AA) // prefix
-                putInt(0x00000000) // version
-                putInt(0x0000000A) // command (0x0A = DISCOVERY)
-                putInt(0x00000000) // length (0 para descoberta)
-                putInt(0x00000000) // sequence
-                putInt(0x00000000) // return code
-                putInt(0x0000AA55) // suffix
-            }.array()
+            // Prefix: 55 AA 00 00, Suffix: AA 55 00 00 (ordem específica do protocolo Tuya)
+            val discoveryPacket = ByteArray(28).apply {
+                var offset = 0
+                // Prefix: 55 AA 00 00
+                this[offset++] = 0x55.toByte()
+                this[offset++] = 0xAA.toByte()
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Version: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Command: 00 00 00 0A (DISCOVERY)
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x0A.toByte()
+                // Length: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Sequence: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Return code: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Suffix: AA 55 00 00
+                this[offset++] = 0xAA.toByte()
+                this[offset++] = 0x55.toByte()
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+            }
             
             log("[DISCOVERY] Pacote de descoberta criado: ${discoveryPacket.size} bytes")
             log("[DISCOVERY] Hex do pacote: ${discoveryPacket.joinToString(" ") { "%02X".format(it) }}")
@@ -760,17 +787,45 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             // Pacote de descoberta Tuya (formato completo com 28 bytes)
-            // Protocolo Tuya usa BIG_ENDIAN (padrão de rede)
-            val discoveryPacket = ByteBuffer.allocate(28).apply {
-                order(ByteOrder.BIG_ENDIAN)
-                putInt(0x000055AA) // prefix
-                putInt(0x00000000) // version
-                putInt(0x0000000A) // command (0x0A = DISCOVERY)
-                putInt(0x00000000) // length
-                putInt(0x00000000) // sequence
-                putInt(0x00000000) // return code
-                putInt(0x0000AA55) // suffix
-            }.array()
+            // Prefix: 55 AA 00 00, Suffix: AA 55 00 00 (ordem específica do protocolo Tuya)
+            val discoveryPacket = ByteArray(28).apply {
+                var offset = 0
+                // Prefix: 55 AA 00 00
+                this[offset++] = 0x55.toByte()
+                this[offset++] = 0xAA.toByte()
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Version: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Command: 00 00 00 0A (DISCOVERY)
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x0A.toByte()
+                // Length: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Sequence: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Return code: 00 00 00 00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+                // Suffix: AA 55 00 00
+                this[offset++] = 0xAA.toByte()
+                this[offset++] = 0x55.toByte()
+                this[offset++] = 0x00
+                this[offset++] = 0x00
+            }
             
             val address = InetAddress.getByName(ip)
             val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, address, DISCOVERY_PORT)
