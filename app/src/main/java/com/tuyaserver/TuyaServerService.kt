@@ -114,7 +114,9 @@ class TuyaServerService : Service() {
         serviceScope.launch(Dispatchers.IO) {
             try {
                 Log.d(TAG, "[START] ========================================")
+                LogCollector.addLog(TAG, "[START] ========================================", "I")
                 Log.d(TAG, "[START] Iniciando servidor HTTP na porta $PORT...")
+                LogCollector.addLog(TAG, "[START] Iniciando servidor HTTP na porta $PORT...", "I")
                 
                 httpServer = HttpServer(PORT, this@TuyaServerService)
                 Log.d(TAG, "[START] HttpServer criado, iniciando...")
@@ -216,6 +218,7 @@ class TuyaServerService : Service() {
             val remoteIp = session.remoteIpAddress
             
             Log.d(TAG, "[HTTP] $method $uri de $remoteIp")
+            LogCollector.addLog(TAG, "[HTTP] $method $uri de $remoteIp", "I")
             
             return try {
                 when {
