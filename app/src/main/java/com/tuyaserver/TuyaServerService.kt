@@ -138,14 +138,19 @@ class TuyaServerService : Service() {
                     
                     routing {
                         get("/health") {
-                            Log.d(TAG, "[HTTP] GET /health recebido de ${call.request.local.remoteHost}")
+                            Log.d(TAG, "[HTTP] GET /health recebido")
                             try {
-                                val response = HealthResponse(status = "ok", site = getSiteName())
+                                val siteName = getSiteName()
+                                val response = HealthResponse(status = "ok", site = siteName)
                                 call.respond(HttpStatusCode.OK, response)
-                                Log.d(TAG, "[HTTP] GET /health respondido com sucesso")
+                                Log.d(TAG, "[HTTP] GET /health respondido com sucesso: site=$siteName")
                             } catch (e: Exception) {
                                 Log.e(TAG, "[HTTP] Erro ao responder /health", e)
-                                call.respond(HttpStatusCode.InternalServerError, "Erro interno")
+                                e.printStackTrace()
+                                call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    TuyaCommandResponse(ok = false, error = "Erro interno: ${e.message}")
+                                )
                             }
                         }
                         
