@@ -4,7 +4,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="#F5F5F5">
+    android:background="#F5F5F5"
+    android:weightSum="1">
 
     <!-- Header -->
     <TextView
@@ -82,6 +83,12 @@
         android:textSize="16sp"
         android:backgroundTint="#2196F3" />
 
+    <!-- Spacer -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
     <!-- Footer -->
     <TextView
         android:layout_width="wrap_content"
@@ -90,7 +97,6 @@
         android:textSize="12sp"
         android:textColor="#999999"
         android:layout_gravity="center"
-        android:layout_marginTop="auto"
         android:layout_marginBottom="16dp" />
 
 </LinearLayout>
