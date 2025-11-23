@@ -302,7 +302,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Enviando comando...", Toast.LENGTH_SHORT).show()
         
         // Envia comando via HTTP usando coroutines
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val url = java.net.URL("http://$localIp:8000/tuya/command")
                 val connection = url.openConnection() as java.net.HttpURLConnection
@@ -333,7 +333,7 @@ class MainActivity : AppCompatActivity() {
                     connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Erro desconhecido"
                 }
                 
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     if (responseCode == 200) {
                         Toast.makeText(this@MainActivity, "✅ Comando enviado com sucesso!", Toast.LENGTH_LONG).show()
                     } else {
@@ -341,15 +341,15 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: java.net.SocketTimeoutException) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "⏱️ Timeout ao conectar ao servidor", Toast.LENGTH_LONG).show()
                 }
             } catch (e: java.net.UnknownHostException) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "❌ Não foi possível conectar ao servidor", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     val errorMsg = e.message ?: "Erro desconhecido"
                     Toast.makeText(this@MainActivity, "❌ Erro: $errorMsg", Toast.LENGTH_LONG).show()
                     android.util.Log.e("MainActivity", "Erro ao enviar comando Tuya", e)
