@@ -661,8 +661,9 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             // Pacote de descoberta Tuya (formato completo com 28 bytes)
+            // Protocolo Tuya usa LITTLE_ENDIAN
             val discoveryPacket = ByteBuffer.allocate(28).apply {
-                order(ByteOrder.BIG_ENDIAN)
+                order(ByteOrder.LITTLE_ENDIAN)
                 putInt(0x000055AA) // prefix
                 putInt(0x00000000) // version
                 putInt(0x0000000A) // command (0x0A = DISCOVERY)
