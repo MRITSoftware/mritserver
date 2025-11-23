@@ -59,13 +59,15 @@ class TuyaClient {
             
             // Comando sempre ligar (on) conforme solicitado
             // DPS 1 = power on/off
-            // Alguns dispositivos usam true/false, outros usam 1/0
-            val command = mapOf("1" to true)  // DPS 1 = power on (boolean)
+            // Tenta primeiro com formato numérico (1/0), que é mais comum
+            // Se não funcionar, pode tentar booleano (true/false)
+            val commandNumeric = mapOf("1" to 1)  // DPS 1 = power on (numérico: 1 = ligar, 0 = desligar)
+            val commandBoolean = mapOf("1" to true)  // DPS 1 = power on (booleano)
             
-            log("[DEBUG] Comando DPS: $command")
-            log("[DEBUG] Formato: {\"1\": true} (DPS 1 = ligar)")
+            log("[DEBUG] Tentando formato numérico primeiro: {\"1\": 1}")
             
-            val payload = buildCommandPayload(command, localKey, protocolVersion)
+            // Tenta primeiro com formato numérico (mais comum)
+            var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion)
             
             log("[DEBUG] Payload total: ${payload.size} bytes")
             log("[DEBUG] Hex do payload completo: ${payload.joinToString(" ") { "%02X".format(it) }}")
@@ -75,13 +77,13 @@ class TuyaClient {
             var lastResponse: ByteArray? = null
             var success = false
             for (attempt in 1..2) {
-                log("[INFO] Tentativa $attempt de 2")
+                log("[INFO] Tentativa $attempt de 2 (formato numérico)")
                 val response = sendUdpPacket(lanIp, PORT, payload)
                 lastResponse = response
                 
                 if (response != null) {
                     if (response.isNotEmpty()) {
-                        log("[DEBUG] Resposta recebida do dispositivo: ${response.size} bytes")
+                        log("[DEBUG] ✅ Resposta recebida do dispositivo: ${response.size} bytes")
                         log("[DEBUG] Hex da resposta completa: ${response.joinToString(" ") { "%02X".format(it) }}")
                         success = true
                         break
@@ -95,6 +97,28 @@ class TuyaClient {
                 // Aguarda um pouco entre tentativas (exceto na última)
                 if (attempt < 2) {
                     kotlinx.coroutines.delay(100) // 100ms entre tentativas (reduzido)
+                }
+            }
+            
+            // Se não teve sucesso, tenta com formato booleano (alguns dispositivos antigos)
+            if (!success && lastResponse == null) {
+                log("[DEBUG] Tentando formato booleano: {\"1\": true}")
+                payload = buildCommandPayload(commandBoolean, localKey, protocolVersion)
+                
+                for (attempt in 1..2) {
+                    log("[INFO] Tentativa $attempt de 2 (formato booleano)")
+                    val response = sendUdpPacket(lanIp, PORT, payload)
+                    lastResponse = response
+                    
+                    if (response != null && response.isNotEmpty()) {
+                        log("[DEBUG] ✅ Resposta recebida com formato booleano: ${response.size} bytes")
+                        success = true
+                        break
+                    }
+                    
+                    if (attempt < 2) {
+                        kotlinx.coroutines.delay(100)
+                    }
                 }
             }
             
