@@ -298,16 +298,25 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             log("[UDP] Criando socket UDP...")
-            // Tenta criar socket bindado a uma porta específica (alguns dispositivos Tuya precisam disso)
+            // Cria socket sem bind (sistema escolhe porta aleatória)
+            // Alguns dispositivos Tuya podem precisar de porta específica, mas vamos tentar sem primeiro
             socket = try {
                 DatagramSocket().apply {
                     soTimeout = TIMEOUT_MS
                     broadcast = false // Não usar broadcast para envio direto
                     reuseAddress = true // Permite reutilizar endereço
-                    // Não faz bind explícito - deixa o sistema escolher a porta
+                    // TTL padrão (pode ajudar em algumas redes)
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            // Android 8.0+ pode ter restrições adicionais
+                        }
+                    } catch (e: Exception) {
+                        // Ignora se não suportar
+                    }
                 }
             } catch (e: Exception) {
-                log("[UDP] ⚠️ Erro ao criar socket: ${e.message}")
+                log("[UDP] ❌ Erro ao criar socket: ${e.message}")
+                e.printStackTrace()
                 return null
             }
             
