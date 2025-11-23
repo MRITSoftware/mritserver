@@ -17,8 +17,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import java.io.IOException
 
 class TuyaServerService : Service() {
@@ -205,13 +207,13 @@ class TuyaServerService : Service() {
                     try {
                         val siteName = service.getSiteName()
                         val response = HealthResponse(status = "ok", site = siteName)
-                        val jsonResponse = json.encodeToString(HealthResponse.serializer(), response)
+                        val jsonResponse = json.encodeToString(serializer<HealthResponse>(), response)
                         Log.d(TAG, "[HTTP] GET /health respondido: $jsonResponse")
                         newFixedLengthResponse(Response.Status.OK, "application/json", jsonResponse)
                     } catch (e: Exception) {
                         Log.e(TAG, "[HTTP] Erro ao responder /health", e)
                         val errorResponse = TuyaCommandResponse(ok = false, error = "Erro interno: ${e.message}")
-                        val jsonError = json.encodeToString(TuyaCommandResponse.serializer(), errorResponse)
+                        val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                         newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
                     }
                 }
@@ -234,7 +236,7 @@ class TuyaServerService : Service() {
                                 ok = false,
                                 error = "action deve ser 'on' ou 'off'"
                             )
-                            val jsonError = json.encodeToString(TuyaCommandResponse.serializer(), errorResponse)
+                            val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                             Log.d(TAG, "[HTTP] POST /tuya/command respondido com erro: Ação inválida")
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
                         }
@@ -246,38 +248,41 @@ class TuyaServerService : Service() {
                                 ok = false,
                                 error = "protocol_version deve ser 3.3 ou 3.4"
                             )
-                            val jsonError = json.encodeToString(TuyaCommandResponse.serializer(), errorResponse)
+                            val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                             Log.d(TAG, "[HTTP] POST /tuya/command respondido com erro: Versão de protocolo inválida")
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
                         }
                         
                         Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo $protocolVersion")
                         
-                        val result = tuyaClient.sendCommand(
-                            action = action,
-                            deviceId = request.tuya_device_id ?: "",
-                            localKey = request.local_key ?: "",
-                            lanIp = request.lan_ip ?: "",
-                            protocolVersion = protocolVersion
-                        )
+                        // sendCommand é suspend, então precisa ser chamado dentro de runBlocking
+                        val result = runBlocking {
+                            tuyaClient.sendCommand(
+                                action = action,
+                                deviceId = request.tuya_device_id ?: "",
+                                localKey = request.local_key ?: "",
+                                lanIp = request.lan_ip ?: "",
+                                protocolVersion = protocolVersion
+                            )
+                        }
                         
                         if (result.isSuccess) {
                             Log.d(TAG, "[HTTP] Comando Tuya enviado com sucesso")
                             val successResponse = TuyaCommandResponse(ok = true, error = null)
-                            val jsonSuccess = json.encodeToString(TuyaCommandResponse.serializer(), successResponse)
+                            val jsonSuccess = json.encodeToString(serializer<TuyaCommandResponse>(), successResponse)
                             newFixedLengthResponse(Response.Status.OK, "application/json", jsonSuccess)
                         } else {
                             val error = result.exceptionOrNull()?.message ?: "Erro desconhecido"
                             Log.e(TAG, "[HTTP] Erro ao enviar comando Tuya: $error")
                             val errorResponse = TuyaCommandResponse(ok = false, error = error)
-                            val jsonError = json.encodeToString(TuyaCommandResponse.serializer(), errorResponse)
+                            val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                             newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
                         }
                     } catch (e: Exception) {
                         val error = e.message ?: "Erro desconhecido"
                         Log.e(TAG, "[HTTP] Erro ao processar /tuya/command: $error", e)
                         val errorResponse = TuyaCommandResponse(ok = false, error = error)
-                        val jsonError = json.encodeToString(TuyaCommandResponse.serializer(), errorResponse)
+                        val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
                         newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", jsonError)
                     }
                 }
