@@ -55,7 +55,7 @@ class TuyaClient {
             }
             
             val payload = buildCommandPayload(command, localKey)
-            val response = sendUdpPacket(lanIp, PORT, payload)
+            sendUdpPacket(lanIp, PORT, payload)
             
             // Para comandos, não é necessário receber resposta confirmada
             // O envio bem-sucedido já indica que o comando foi processado
