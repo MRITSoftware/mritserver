@@ -48,21 +48,26 @@ class TuyaClient {
         }
         
         try {
-            log("[INFO] Enviando '$action' → $deviceId @ $lanIp")
+            log("[INFO] Enviando '$action' → $deviceId @ $lanIp (protocolo $protocolVersion)")
             
-            val command = if (action == "on") {
-                mapOf("1" to true)  // DPS 1 = power on
-            } else {
-                mapOf("1" to false) // DPS 1 = power off
-            }
+            // Comando sempre ligar (on) conforme solicitado
+            val command = mapOf("1" to true)  // DPS 1 = power on
+            
+            log("[DEBUG] Comando DPS: $command")
             
             val payload = buildCommandPayload(command, localKey, protocolVersion)
-            sendUdpPacket(lanIp, PORT, payload)
+            
+            log("[DEBUG] Payload total: ${payload.size} bytes")
+            log("[DEBUG] Hex do payload (primeiros 32 bytes): ${payload.take(32).joinToString(" ") { "%02X".format(it) }}")
+            
+            val response = sendUdpPacket(lanIp, PORT, payload)
+            
+            if (response != null && response.isNotEmpty()) {
+                log("[DEBUG] Resposta recebida do dispositivo: ${response.size} bytes")
+                log("[DEBUG] Hex da resposta (primeiros 32 bytes): ${response.take(32).joinToString(" ") { "%02X".format(it) }}")
+            }
             
             log("[INFO] Protocolo Tuya ${protocolVersion} usado")
-            
-            // Para comandos, não é necessário receber resposta confirmada
-            // O envio bem-sucedido já indica que o comando foi processado
             log("[OK] Comando enviado com sucesso")
             Result.success(Unit)
             
@@ -80,11 +85,23 @@ class TuyaClient {
         val jsonCommand = command.entries.joinToString(", ") { (k, v) ->
             "\"$k\":${if (v is Boolean) v else "\"$v\""}"
         }
-        val json = "{\"dps\":{$jsonCommand}}"
+        
+        // Protocolo 3.4 requer timestamp no payload
+        val timestamp = System.currentTimeMillis() / 1000 // timestamp em segundos
+        val json = if (protocolVersion >= 3.4) {
+            "{\"t\":$timestamp,\"dps\":{$jsonCommand}}"
+        } else {
+            "{\"dps\":{$jsonCommand}}"
+        }
+        
+        log("[DEBUG] JSON payload: $json")
         
         // Cria payload Tuya
         val payload = json.toByteArray(Charsets.UTF_8)
+        log("[DEBUG] Payload antes de criptografar: ${payload.size} bytes")
+        
         val encrypted = encrypt(payload, localKey)
+        log("[DEBUG] Payload criptografado: ${encrypted.size} bytes")
         
         // Monta pacote Tuya 3.3 ou 3.4
         // Header: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) = 24 bytes
@@ -174,25 +191,20 @@ class TuyaClient {
     
     /**
      * Prepara a chave para ter exatamente 16 bytes (MD5 hash se necessário)
+     * Protocolo Tuya sempre usa MD5 da chave, independente do tamanho
      */
     private fun prepareKey(key: String): ByteArray {
         val keyBytes = key.toByteArray(Charsets.UTF_8)
         
-        return when {
-            keyBytes.size == 16 -> keyBytes
-            keyBytes.size < 16 -> {
-                // Padding com zeros se menor que 16
-                ByteArray(16).apply {
-                    System.arraycopy(keyBytes, 0, this, 0, keyBytes.size)
-                }
-            }
-            else -> {
-                // Se maior que 16, usa MD5 hash
-                val md = MessageDigest.getInstance("MD5")
-                md.update(keyBytes)
-                md.digest()
-            }
-        }
+        // Tuya sempre usa MD5 da chave para ter exatamente 16 bytes
+        val md = MessageDigest.getInstance("MD5")
+        md.update(keyBytes)
+        val keyHash = md.digest()
+        
+        log("[DEBUG] Chave original: ${key.length} chars")
+        log("[DEBUG] Chave MD5: ${keyHash.joinToString(" ") { "%02X".format(it) }}")
+        
+        return keyHash
     }
     
     private fun log(msg: String) {
