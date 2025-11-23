@@ -472,7 +472,7 @@ class MainActivity : AppCompatActivity() {
                         "tuya_device_id": "$deviceId",
                         "local_key": "$localKey",
                         "lan_ip": "$lanIp",
-                        "protocol_version": 3.3
+                        "protocol_version": 3.4
                     }
                 """.trimIndent()
                 

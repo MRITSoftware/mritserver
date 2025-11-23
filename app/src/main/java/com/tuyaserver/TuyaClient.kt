@@ -20,7 +20,7 @@ class TuyaClient(private val context: Context? = null) {
     
     companion object {
         private const val TAG = "TuyaClient"
-        private const val DEFAULT_PROTOCOL_VERSION = 3.3 // Padrão 3.3 (como no Python)
+        private const val DEFAULT_PROTOCOL_VERSION = 3.4 // Padrão 3.4
         private const val PORT = 6668 // Porta para comandos
         private const val DISCOVERY_PORT = 6666 // Porta para descoberta
         private const val TIMEOUT_MS = 5000 // Timeout de 5s para dar tempo do dispositivo responder

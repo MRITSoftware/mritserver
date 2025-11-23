@@ -341,7 +341,7 @@ class TuyaServerService : Service() {
                             return response
                         }
                         
-                        val protocolVersion = request.protocol_version ?: 3.3 // Padrão 3.3 (como no Python)
+                        val protocolVersion = request.protocol_version ?: 3.4 // Padrão 3.4
                         
                         if (protocolVersion != 3.3 && protocolVersion != 3.4) {
                             val errorResponse = TuyaCommandResponse(
