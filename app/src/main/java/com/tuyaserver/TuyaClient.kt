@@ -77,61 +77,68 @@ class TuyaClient {
             val commandNumeric = mapOf("1" to 1)  // DPS 1 = power on (numérico: 1 = ligar, 0 = desligar)
             val commandBoolean = mapOf("1" to true)  // DPS 1 = power on (booleano)
             
-            log("[DEBUG] Tentando formato numérico primeiro: {\"1\": 1}")
-            
-            // Tenta primeiro com formato numérico (mais comum)
-            var payload = buildCommandPayload(commandNumeric, localKey, protocolVersion)
-            
-            log("[DEBUG] Payload total: ${payload.size} bytes")
-            log("[DEBUG] Hex do payload completo: ${payload.joinToString(" ") { "%02X".format(it) }}")
-            
-            // Tenta enviar múltiplas vezes (2 tentativas) para garantir que o comando chegue
-            // Reduzido para 2 tentativas para evitar timeout no cliente HTTP
+            // Tenta múltiplas variações do protocolo para garantir compatibilidade
+            // Muitos dispositivos Tuya 3.4 precisam de sequence = 0, não timestamp
             var lastResponse: ByteArray? = null
             var success = false
-            for (attempt in 1..2) {
-                log("[INFO] Tentativa $attempt de 2 (formato numérico)")
+            
+            // Variação 1: Protocolo 3.4, formato numérico, sequence = 0 (MAIS COMUM)
+            log("[INFO] Tentativa 1: Protocolo 3.4, formato numérico, sequence=0")
+            var payload = buildCommandPayload(commandNumeric, localKey, 3.4, sequenceZero = true)
+            for (attempt in 1..3) {
+                log("[INFO] Enviando tentativa $attempt de 3")
                 val response = sendUdpPacket(lanIp, PORT, payload)
                 lastResponse = response
-                
-                if (response != null) {
-                    if (response.isNotEmpty()) {
-                        log("[DEBUG] ✅ Resposta recebida do dispositivo: ${response.size} bytes")
-                        log("[DEBUG] Hex da resposta completa: ${response.joinToString(" ") { "%02X".format(it) }}")
+                if (response != null && response.isNotEmpty()) {
+                    log("[DEBUG] ✅ Resposta recebida!")
+                    success = true
+                    break
+                }
+                if (attempt < 3) kotlinx.coroutines.delay(300)
+            }
+            
+            // Variação 2: Protocolo 3.3, formato numérico, sequence = 0
+            if (!success) {
+                log("[INFO] Tentativa 2: Protocolo 3.3, formato numérico, sequence=0")
+                payload = buildCommandPayload(commandNumeric, localKey, 3.3, sequenceZero = true)
+                for (attempt in 1..3) {
+                    val response = sendUdpPacket(lanIp, PORT, payload)
+                    if (response != null && response.isNotEmpty()) {
+                        log("[DEBUG] ✅ Resposta recebida com protocolo 3.3!")
                         success = true
                         break
-                    } else {
-                        log("[DEBUG] Sem resposta (timeout) - tentativa $attempt")
                     }
-                } else {
-                    log("[WARN] Erro ao enviar - tentativa $attempt")
-                }
-                
-                // Aguarda um pouco entre tentativas (exceto na última)
-                if (attempt < 2) {
-                    kotlinx.coroutines.delay(100) // 100ms entre tentativas (reduzido)
+                    if (attempt < 3) kotlinx.coroutines.delay(300)
                 }
             }
             
-            // Se não teve sucesso, tenta com formato booleano (alguns dispositivos antigos)
-            if (!success && lastResponse == null) {
-                log("[DEBUG] Tentando formato booleano: {\"1\": true}")
-                payload = buildCommandPayload(commandBoolean, localKey, protocolVersion)
-                
-                for (attempt in 1..2) {
-                    log("[INFO] Tentativa $attempt de 2 (formato booleano)")
+            // Variação 3: Protocolo 3.4, formato booleano, sequence = 0
+            if (!success) {
+                log("[INFO] Tentativa 3: Protocolo 3.4, formato booleano, sequence=0")
+                payload = buildCommandPayload(commandBoolean, localKey, 3.4, sequenceZero = true)
+                for (attempt in 1..3) {
                     val response = sendUdpPacket(lanIp, PORT, payload)
-                    lastResponse = response
-                    
                     if (response != null && response.isNotEmpty()) {
-                        log("[DEBUG] ✅ Resposta recebida com formato booleano: ${response.size} bytes")
+                        log("[DEBUG] ✅ Resposta recebida com formato booleano!")
                         success = true
                         break
                     }
-                    
-                    if (attempt < 2) {
-                        kotlinx.coroutines.delay(100)
+                    if (attempt < 3) kotlinx.coroutines.delay(300)
+                }
+            }
+            
+            // Variação 4: Protocolo 3.4, formato numérico, sequence = timestamp (menos comum)
+            if (!success) {
+                log("[INFO] Tentativa 4: Protocolo 3.4, formato numérico, sequence=timestamp")
+                payload = buildCommandPayload(commandNumeric, localKey, 3.4, sequenceZero = false)
+                for (attempt in 1..2) {
+                    val response = sendUdpPacket(lanIp, PORT, payload)
+                    if (response != null && response.isNotEmpty()) {
+                        log("[DEBUG] ✅ Resposta recebida com sequence=timestamp!")
+                        success = true
+                        break
                     }
+                    if (attempt < 2) kotlinx.coroutines.delay(300)
                 }
             }
             
@@ -153,8 +160,9 @@ class TuyaClient {
     
     /**
      * Constrói o payload do comando Tuya (protocolo 3.3 ou 3.4)
+     * @param sequenceZero Se true, usa sequence = 0 mesmo no protocolo 3.4
      */
-    private fun buildCommandPayload(command: Map<String, Any>, localKey: String, protocolVersion: Double): ByteArray {
+    private fun buildCommandPayload(command: Map<String, Any>, localKey: String, protocolVersion: Double, sequenceZero: Boolean = true): ByteArray {
         // Converte comando para JSON
         val jsonCommand = command.entries.joinToString(", ") { (k, v) ->
             "\"$k\":${if (v is Boolean) v else if (v is Number) v else "\"$v\""}"
@@ -190,10 +198,11 @@ class TuyaClient {
         // Protocolo 3.4: version = 0x00000000 (mesmo valor, mas pode ter diferenças no payload)
         val protocolVersionInt = 0x00000000
         
-        // Sequence number: para protocolo 3.4, alguns dispositivos usam timestamp, outros usam 0
-        // Vamos tentar com timestamp primeiro (padrão), mas alguns dispositivos podem precisar de 0
-        val sequence = if (protocolVersion >= 3.4) {
-            timestamp // Usa timestamp como sequence para 3.4 (padrão)
+        // Sequence number: muitos dispositivos Tuya precisam de sequence = 0
+        val sequence = if (sequenceZero) {
+            0x00000000 // Usa 0 (mais comum)
+        } else if (protocolVersion >= 3.4) {
+            timestamp // Usa timestamp (menos comum)
         } else {
             0x00000000
         }
