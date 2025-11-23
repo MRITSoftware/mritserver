@@ -248,16 +248,17 @@ class TuyaClient(private val context: Context? = null) {
         log("[DEBUG] Encrypted size: ${encrypted.size} bytes")
         log("[DEBUG] ========================================")
         
+        // Protocolo Tuya usa LITTLE_ENDIAN para inteiros de 32 bits
         val packet = ByteBuffer.allocate(totalSize).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(0x000055AA) // prefix
+            order(ByteOrder.LITTLE_ENDIAN)
+            putInt(0x000055AA) // prefix (será escrito como AA 55 00 00 em little-endian)
             putInt(protocolVersionInt) // version (0 = 3.3 ou 3.4)
             putInt(0x0000000D) // command (0x0D = CONTROL)
             putInt(encrypted.size) // length
             putInt(sequence) // sequence (timestamp para 3.4)
             putInt(0x00000000) // return code
             put(encrypted) // payload criptografado
-            putInt(0x0000AA55) // suffix
+            putInt(0x0000AA55) // suffix (será escrito como 55 AA 00 00 em little-endian)
         }
         
         val packetArray = packet.array()
@@ -443,8 +444,9 @@ class TuyaClient(private val context: Context? = null) {
             // Pacote de descoberta Tuya
             // Formato: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) + suffix(4) = 28 bytes
             // Prefix: 0x000055AA, Command: 0x0000000A (DISCOVERY), Version: 0x00000000
+            // Protocolo Tuya usa LITTLE_ENDIAN
             val discoveryPacket = ByteBuffer.allocate(28).apply {
-                order(ByteOrder.BIG_ENDIAN)
+                order(ByteOrder.LITTLE_ENDIAN)
                 putInt(0x000055AA) // prefix
                 putInt(0x00000000) // version
                 putInt(0x0000000A) // command (0x0A = DISCOVERY)
