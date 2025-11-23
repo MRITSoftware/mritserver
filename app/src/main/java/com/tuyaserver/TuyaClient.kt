@@ -298,10 +298,17 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             log("[UDP] Criando socket UDP...")
-            socket = DatagramSocket().apply {
-                soTimeout = TIMEOUT_MS
-                broadcast = false // Não usar broadcast para envio direto
-                reuseAddress = true // Permite reutilizar endereço
+            // Tenta criar socket bindado a uma porta específica (alguns dispositivos Tuya precisam disso)
+            socket = try {
+                DatagramSocket().apply {
+                    soTimeout = TIMEOUT_MS
+                    broadcast = false // Não usar broadcast para envio direto
+                    reuseAddress = true // Permite reutilizar endereço
+                    // Não faz bind explícito - deixa o sistema escolher a porta
+                }
+            } catch (e: Exception) {
+                log("[UDP] ⚠️ Erro ao criar socket: ${e.message}")
+                return null
             }
             
             log("[UDP] Resolvendo endereço: $ip")
