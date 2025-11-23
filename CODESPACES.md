@@ -13,6 +13,12 @@
    source ~/.bashrc
    ```
 
+3. **Gerar Gradle Wrapper (primeira vez):**
+   ```bash
+   # Se o gradlew não funcionar, gere o wrapper:
+   gradle wrapper --gradle-version 8.4
+   ```
+
 3. **Verificar Instalação:**
    ```bash
    java -version
