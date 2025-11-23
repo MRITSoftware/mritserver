@@ -509,7 +509,7 @@ class TuyaClient(private val context: Context? = null) {
                     
                     val buffer = ByteArray(1024)
                     val responsePacket = DatagramPacket(buffer, buffer.size)
-                    socket.soTimeout = remainingTime.coerceAtLeast(500) // Mínimo 500ms
+                    socket.soTimeout = remainingTime.coerceAtLeast(500).toInt() // Mínimo 500ms, converte para Int
                     socket.receive(responsePacket)
                     
                     val deviceIp = responsePacket.address.hostAddress ?: continue
