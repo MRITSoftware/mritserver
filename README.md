@@ -10,29 +10,65 @@ Servidor HTTP Android para controlar dispositivos Tuya localmente, convertido do
 - ✅ Serviço Android rodando em background
 - ✅ Interface simples para iniciar/parar servidor
 
-## Como Usar
+## 🚀 Como Usar (100% no GitHub)
 
-### Clonar o Repositório
+### Opção 1: GitHub Codespaces (Recomendado)
+
+1. **Abrir Codespace:**
+   - Vá para https://github.com/MRITSoftware/mritserver
+   - Clique no botão verde **"Code"**
+   - Selecione a aba **"Codespaces"**
+   - Clique em **"Create codespace on main"**
+   - Aguarde o ambiente ser criado (pode levar alguns minutos na primeira vez)
+
+2. **No Codespace:**
+   - O ambiente já vem configurado com Android SDK e Gradle
+   - Abra o terminal integrado (`` Ctrl+` `` ou View → Terminal)
+   - Execute para sincronizar dependências:
+     ```bash
+     source ~/.bashrc
+     ./gradlew build
+     ```
+
+3. **Editar código:**
+   - Use o editor integrado do VS Code no navegador
+   - Todas as extensões Kotlin/Java já estão instaladas
+   - O código é salvo automaticamente no repositório
+
+4. **Build e Test:**
+   ```bash
+   # Build do projeto
+   ./gradlew build
+   
+   # Gerar APK
+   ./gradlew assembleDebug
+   
+   # O APK estará em: app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+### Opção 2: GitHub Actions (Build Automático)
+
+- Toda vez que você fizer `git push`, o GitHub Actions vai:
+  - Compilar o projeto automaticamente
+  - Gerar o APK
+  - Disponibilizar para download na aba **"Actions"** do repositório
+
+### Opção 3: Clonar Localmente (se tiver Android Studio)
 
 ```bash
 git clone https://github.com/MRITSoftware/mritserver.git
 cd mritserver
+# Abrir no Android Studio
 ```
 
-### Configurar no Android Studio
+### 📱 Usar o App no Dispositivo
 
-1. Abra o Android Studio
-2. Selecione "Open" e escolha a pasta `mritserver`
-3. Aguarde o Gradle sincronizar (baixar dependências)
-4. Conecte um dispositivo Android ou inicie um emulador
-5. Execute o app (Shift+F10 ou botão Run)
-
-### Usar o App
-
-1. Na primeira execução, clique em "Configurar Site" e digite o nome (ex: `GELAFIT_SP01`)
-2. Clique em "Iniciar Servidor" para iniciar o servidor HTTP na porta 8000
-3. O servidor ficará rodando em background mesmo se fechar o app
-4. Para parar, abra o app novamente e clique em "Parar Servidor"
+1. Baixe o APK gerado (do Codespaces ou GitHub Actions)
+2. Instale no dispositivo Android (permita instalação de fontes desconhecidas)
+3. Na primeira execução, clique em "Configurar Site" e digite o nome (ex: `GELAFIT_SP01`)
+4. Clique em "Iniciar Servidor" para iniciar o servidor HTTP na porta 8000
+5. O servidor ficará rodando em background mesmo se fechar o app
+6. Para parar, abra o app novamente e clique em "Parar Servidor"
 
 ## API
 
