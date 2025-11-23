@@ -207,22 +207,42 @@ class TuyaServerService : Service() {
                     }
                     
                     uri == "/health" && method == Method.GET -> {
+                        Log.d(TAG, "[HTTP] GET /health recebido")
                         try {
-                            val siteName = service.getSiteName()
+                            val siteName = try {
+                                service.getSiteName()
+                            } catch (e: Exception) {
+                                Log.w(TAG, "[HTTP] Erro ao obter site name, usando padrão: ${e.message}")
+                                "SITE_DESCONHECIDO"
+                            }
+                            
+                            Log.d(TAG, "[HTTP] Site name obtido: $siteName")
+                            
                             val responseObj = HealthResponse(status = "ok", site = siteName)
-                            val jsonResponse = json.encodeToString(serializer<HealthResponse>(), responseObj)
-                            Log.d(TAG, "[HTTP] GET /health respondido: $jsonResponse")
+                            Log.d(TAG, "[HTTP] HealthResponse criado: $responseObj")
+                            
+                            val jsonResponse = try {
+                                json.encodeToString(serializer<HealthResponse>(), responseObj)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "[HTTP] Erro ao serializar JSON: ${e.message}", e)
+                                // Fallback: retorna JSON manual
+                                "{\"status\":\"ok\",\"site\":\"$siteName\"}"
+                            }
+                            
+                            Log.d(TAG, "[HTTP] JSON response: $jsonResponse")
                             val response = newFixedLengthResponse(Response.Status.OK, "application/json", jsonResponse)
                             response.addHeader("Access-Control-Allow-Origin", "*")
                             response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            Log.d(TAG, "[HTTP] ✅ GET /health respondido com sucesso")
                             response
                         } catch (e: Exception) {
-                            Log.e(TAG, "[HTTP] Erro ao responder /health", e)
+                            Log.e(TAG, "[HTTP] ❌ Erro ao responder /health", e)
                             e.printStackTrace()
-                            // Retorna erro simples em texto para evitar problemas de serialização
-                            val errorMsg = "Erro interno: ${e.message ?: "Desconhecido"}"
-                            val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", errorMsg)
-                            response.addHeader("Content-Type", "text/plain; charset=utf-8")
+                            // Retorna JSON simples mesmo em caso de erro
+                            val errorJson = "{\"status\":\"error\",\"error\":\"${e.message ?: "Erro desconhecido"}\"}"
+                            val response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errorJson)
+                            response.addHeader("Content-Type", "application/json; charset=utf-8")
+                            response.addHeader("Access-Control-Allow-Origin", "*")
                             response
                         }
                     }
