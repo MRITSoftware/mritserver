@@ -112,24 +112,41 @@ class TuyaServerService : Service() {
     private fun startServer() {
         serviceScope.launch(Dispatchers.IO) {
             try {
+                Log.d(TAG, "[START] ========================================")
                 Log.d(TAG, "[START] Iniciando servidor HTTP na porta $PORT...")
                 
                 httpServer = HttpServer(PORT, this@TuyaServerService)
-                httpServer?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+                Log.d(TAG, "[START] HttpServer criado, iniciando...")
                 
-                Log.d(TAG, "[START] ✅ Servidor NanoHTTPD iniciado na porta $PORT")
-                Log.d(TAG, "[START] Servidor MRIT local rodando em http://0.0.0.0:$PORT (SITE=${getSiteName()})")
+                val started = httpServer?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+                Log.d(TAG, "[START] httpServer.start() retornou: $started")
+                
+                if (httpServer?.isAlive == true) {
+                    Log.d(TAG, "[START] ✅ Servidor NanoHTTPD iniciado e ALIVE na porta $PORT")
+                } else {
+                    Log.w(TAG, "[START] ⚠️ Servidor iniciado mas isAlive = false")
+                }
+                
+                val siteName = try {
+                    getSiteName()
+                } catch (e: Exception) {
+                    Log.w(TAG, "[START] Erro ao obter site name: ${e.message}")
+                    "SITE_DESCONHECIDO"
+                }
+                
+                Log.d(TAG, "[START] Servidor MRIT local rodando em http://0.0.0.0:$PORT (SITE=$siteName)")
+                Log.d(TAG, "[START] ========================================")
                 
                 // Testa conexão local após 2 segundos
                 kotlinx.coroutines.delay(2000)
                 testLocalConnection()
                 
             } catch (e: IOException) {
-                Log.e(TAG, "[START] ❌ Erro ao iniciar servidor: ${e.message}", e)
+                Log.e(TAG, "[START] ❌ Erro IOException ao iniciar servidor: ${e.message}", e)
                 e.printStackTrace()
                 updateNotificationError("Erro ao iniciar: ${e.message}")
             } catch (e: Exception) {
-                Log.e(TAG, "[START] ❌ Erro fatal ao iniciar servidor", e)
+                Log.e(TAG, "[START] ❌ Erro fatal ao iniciar servidor: ${e.javaClass.simpleName}", e)
                 e.printStackTrace()
                 updateNotificationError("Erro fatal: ${e.message}")
             }
