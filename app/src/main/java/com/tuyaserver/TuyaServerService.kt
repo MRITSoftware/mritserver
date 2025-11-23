@@ -1,9 +1,16 @@
 package com.tuyaserver
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -25,6 +32,8 @@ class TuyaServerService : Service() {
     companion object {
         private const val TAG = "TuyaServerService"
         private const val PORT = 8000
+        private const val CHANNEL_ID = "TuyaServerChannel"
+        private const val NOTIFICATION_ID = 1
     }
     
     private var server: NettyApplicationEngine? = null
@@ -43,6 +52,9 @@ class TuyaServerService : Service() {
         super.onCreate()
         Log.d(TAG, "Serviço criado")
         
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, createNotification())
+        
         configManager = ConfigManager(this)
         val siteName = getSiteName()
         
@@ -52,7 +64,38 @@ class TuyaServerService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand chamado")
         return START_STICKY // Reinicia o serviço se for morto
+    }
+    
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Tuya Server",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Servidor HTTP Tuya rodando em background"
+            }
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+    
+    private fun createNotification(): Notification {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Tuya Server")
+            .setContentText("Servidor rodando na porta $PORT")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .build()
     }
     
     override fun onBind(intent: Intent?): IBinder? = null

@@ -1,7 +1,12 @@
 package com.tuyaserver
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -30,13 +35,26 @@ class MainActivity : AppCompatActivity() {
         updateUI()
         
         startButton.setOnClickListener {
-            startService(Intent(this, TuyaServerService::class.java))
-            updateUI()
+            try {
+                val intent = Intent(this, TuyaServerService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+                updateUI()
+            } catch (e: Exception) {
+                statusText.text = "Erro: ${e.message}"
+            }
         }
         
         stopButton.setOnClickListener {
-            stopService(Intent(this, TuyaServerService::class.java))
-            updateUI()
+            try {
+                stopService(Intent(this, TuyaServerService::class.java))
+                updateUI()
+            } catch (e: Exception) {
+                statusText.text = "Erro: ${e.message}"
+            }
         }
         
         configButton.setOnClickListener {
@@ -47,7 +65,26 @@ class MainActivity : AppCompatActivity() {
     private fun updateUI() {
         val siteName = configManager.getSiteName()
         siteNameText.text = "Site: $siteName"
-        statusText.text = "Servidor: Parado"
+        
+        // Verifica se o serviço está rodando
+        val isRunning = isServiceRunning(TuyaServerService::class.java)
+        statusText.text = if (isRunning) {
+            "Servidor: Rodando na porta 8000"
+        } else {
+            "Servidor: Parado"
+        }
+    }
+    
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val runningServices = activityManager.getRunningServices(Integer.MAX_VALUE)
+        
+        for (service in runningServices) {
+            if (serviceClass.name == service.service.className) {
+                return true
+            }
+        }
+        return false
     }
     
     private fun showConfigDialog() {
@@ -65,8 +102,13 @@ class MainActivity : AppCompatActivity() {
                     configManager.saveConfig(siteName)
                     updateUI()
                     // Reinicia o serviço para aplicar nova configuração
-                    stopService(Intent(this, TuyaServerService::class.java))
-                    startService(Intent(this, TuyaServerService::class.java))
+                    val intent = Intent(this, TuyaServerService::class.java)
+                    stopService(intent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
+                    } else {
+                        startService(intent)
+                    }
                 }
             }
             .setNegativeButton("Cancelar", null)
