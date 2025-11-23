@@ -250,29 +250,30 @@ class TuyaClient(private val context: Context? = null) {
         log("[DEBUG] Encrypted size: ${encrypted.size} bytes")
         log("[DEBUG] ========================================")
         
-        // Protocolo Tuya usa LITTLE_ENDIAN para inteiros de 32 bits
+        // Protocolo Tuya: alguns campos podem usar big-endian, outros little-endian
+        // Vamos tentar com BIG_ENDIAN primeiro (como muitos protocolos de rede usam)
         val packet = ByteBuffer.allocate(totalSize).apply {
-            order(ByteOrder.LITTLE_ENDIAN)
-            putInt(0x000055AA) // prefix (será escrito como AA 55 00 00 em little-endian)
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(0x000055AA) // prefix (será escrito como 00 00 55 AA em big-endian)
             putInt(protocolVersionInt) // version (0 = 3.3 ou 3.4)
             putInt(0x0000000D) // command (0x0D = CONTROL)
             putInt(encrypted.size) // length
             putInt(sequence) // sequence (timestamp para 3.4)
             putInt(0x00000000) // return code
             put(encrypted) // payload criptografado
-            putInt(0x0000AA55) // suffix (será escrito como 55 AA 00 00 em little-endian)
+            putInt(0x0000AA55) // suffix (será escrito como 00 00 AA 55 em big-endian)
         }
         
         val packetArray = packet.array()
         log("[DEBUG] Pacote completo: ${packetArray.size} bytes")
         log("[DEBUG] Header completo (24 bytes): ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (little-endian: AA 55 00 00 = 0x000055AA)")
+        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 55 AA = 0x000055AA)")
         log("[DEBUG] Version: ${packetArray.slice(4..7).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (little-endian: 0D 00 00 00 = 0x0000000D)")
-        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes, little-endian)")
-        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }} (little-endian)")
+        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 00 0D = 0x0000000D)")
+        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes, big-endian)")
+        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }} (big-endian)")
         log("[DEBUG] Return code: ${packetArray.slice(20..23).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (little-endian: 55 AA 00 00 = 0x0000AA55)")
+        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 AA 55 = 0x0000AA55)")
         
         return packetArray
     }
@@ -498,9 +499,9 @@ class TuyaClient(private val context: Context? = null) {
             // Pacote de descoberta Tuya
             // Formato: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) + suffix(4) = 28 bytes
             // Prefix: 0x000055AA, Command: 0x0000000A (DISCOVERY), Version: 0x00000000
-            // Protocolo Tuya usa LITTLE_ENDIAN
+            // Protocolo Tuya usa BIG_ENDIAN (padrão de rede)
             val discoveryPacket = ByteBuffer.allocate(28).apply {
-                order(ByteOrder.LITTLE_ENDIAN)
+                order(ByteOrder.BIG_ENDIAN)
                 putInt(0x000055AA) // prefix
                 putInt(0x00000000) // version
                 putInt(0x0000000A) // command (0x0A = DISCOVERY)
@@ -715,9 +716,9 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             // Pacote de descoberta Tuya (formato completo com 28 bytes)
-            // Protocolo Tuya usa LITTLE_ENDIAN
+            // Protocolo Tuya usa BIG_ENDIAN (padrão de rede)
             val discoveryPacket = ByteBuffer.allocate(28).apply {
-                order(ByteOrder.LITTLE_ENDIAN)
+                order(ByteOrder.BIG_ENDIAN)
                 putInt(0x000055AA) // prefix
                 putInt(0x00000000) // version
                 putInt(0x0000000A) // command (0x0A = DISCOVERY)
