@@ -81,7 +81,8 @@ class TuyaServerService : Service() {
                             try {
                                 val request = call.receive<TuyaCommandRequest>()
                                 
-                                if (request.action !in listOf("on", "off")) {
+                                val action = request.action
+                                if (action == null || action !in listOf("on", "off")) {
                                     call.respond(
                                         HttpStatusCode.BadRequest,
                                         TuyaCommandResponse(
@@ -93,7 +94,7 @@ class TuyaServerService : Service() {
                                 }
                                 
                                 val result = tuyaClient.sendCommand(
-                                    action = request.action,
+                                    action = action,
                                     deviceId = request.tuya_device_id ?: "",
                                     localKey = request.local_key ?: "",
                                     lanIp = request.lan_ip ?: ""
@@ -125,7 +126,7 @@ class TuyaServerService : Service() {
                     }
                 }.start(wait = false)
                 
-                Log.d(TAG, "[START] Servidor Tuya local rodando em http://0.0.0.0:$PORT (SITE=$siteName)")
+                Log.d(TAG, "[START] Servidor Tuya local rodando em http://0.0.0.0:$PORT (SITE=${getSiteName()})")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao iniciar servidor", e)
