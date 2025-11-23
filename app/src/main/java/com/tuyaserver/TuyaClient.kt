@@ -700,6 +700,7 @@ class TuyaClient(private val context: Context? = null) {
     
     private fun log(msg: String) {
         Log.d(TAG, msg)
+        LogCollector.addLog(TAG, msg, "D")
     }
 }
 

@@ -130,7 +130,15 @@
         android:text="Comando Tuya"
         android:textSize="16sp"
         android:backgroundTint="#FF9800"
-        android:visibility="gone" />
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/logsButton"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="📋 Ver Logs"
+        android:textSize="16sp"
+        android:backgroundTint="#9C27B0" />
 
     <!-- Spacer -->
     <View

@@ -89,6 +89,10 @@ class MainActivity : AppCompatActivity() {
         tuyaCommandButton.setOnClickListener {
             showTuyaCommandDialog()
         }
+        
+        logsButton.setOnClickListener {
+            showLogsDialog()
+        }
     }
     
     private fun updateUI() {
@@ -528,6 +532,107 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+    
+    private fun showLogsDialog() {
+        val logs = LogCollector.getAllLogs()
+        val logCount = LogCollector.getLogCount()
+        
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+        }
+        
+        val textView = android.widget.TextView(this).apply {
+            text = if (logs.isEmpty()) {
+                "Nenhum log ainda.\n\nOs logs aparecerão aqui quando você:\n• Enviar comandos Tuya\n• Descobrir dispositivos\n• O servidor processar requisições"
+            } else {
+                logs
+            }
+            textSize = 10f
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            setTextColor(android.graphics.Color.BLACK)
+            setPadding(16, 16, 16, 16)
+            background = android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)
+        }
+        
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            addView(textView)
+        }
+        
+        layout.addView(scrollView)
+        
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("📋 Logs do Sistema (${logCount} entradas)")
+            .setView(layout)
+            .setPositiveButton("📋 Copiar Todos") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Logs Tuya", logs.ifEmpty { "Nenhum log disponível" })
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "✅ Logs copiados para área de transferência!", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("🔍 Filtrar Tuya") { _, _ ->
+                showFilteredLogsDialog("Tuya")
+            }
+            .setNegativeButton("🗑️ Limpar") { _, _ ->
+                LogCollector.clearLogs()
+                Toast.makeText(this, "Logs limpos", Toast.LENGTH_SHORT).show()
+            }
+            .create()
+        
+        dialog.show()
+    }
+    
+    private fun showFilteredLogsDialog(filter: String) {
+        val logs = LogCollector.getFilteredLogs(filter)
+        
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+        }
+        
+        val textView = android.widget.TextView(this).apply {
+            text = if (logs.isEmpty()) {
+                "Nenhum log encontrado com filtro: $filter"
+            } else {
+                logs
+            }
+            textSize = 10f
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            setTextColor(android.graphics.Color.BLACK)
+            setPadding(16, 16, 16, 16)
+            background = android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)
+        }
+        
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            addView(textView)
+        }
+        
+        layout.addView(scrollView)
+        
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("📋 Logs Filtrados: $filter")
+            .setView(layout)
+            .setPositiveButton("📋 Copiar") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Logs Tuya Filtrados", logs.ifEmpty { "Nenhum log encontrado" })
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "✅ Logs copiados!", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Fechar", null)
+            .create()
+        
+        dialog.show()
     }
 }
 
