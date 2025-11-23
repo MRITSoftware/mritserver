@@ -27,25 +27,28 @@ jobs:
       run: |
         mkdir -p gradle/wrapper
         if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-          echo "Baixando gradle-wrapper.jar do Maven Central..."
-          # Baixa o gradle-wrapper.jar do Maven Central (mais confiável)
-          curl -L -o gradle/wrapper/gradle-wrapper.jar \
-            https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar || \
-          {
-            echo "Fallback: Gerando wrapper com Gradle..."
-            # Fallback: instala Gradle e gera wrapper
-            wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
-            unzip -q /tmp/gradle.zip -d /tmp
-            /tmp/gradle-8.4/bin/gradle wrapper --gradle-version 8.4 --distribution-type bin
-          }
+          echo "Instalando Gradle para gerar wrapper..."
+          # Instala Gradle 8.4
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          export PATH=$PATH:/tmp/gradle-8.4/bin
+          
+          echo "Gerando Gradle Wrapper..."
+          # Gera o wrapper
+          cd $GITHUB_WORKSPACE
+          /tmp/gradle-8.4/bin/gradle wrapper --gradle-version 8.4 --distribution-type bin
+          
+          # Verifica se foi criado
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "ERRO: Falha ao gerar gradle-wrapper.jar"
+            exit 1
+          fi
+          echo "✅ gradle-wrapper.jar gerado com sucesso"
+        else
+          echo "✅ gradle-wrapper.jar já existe"
         fi
         chmod +x gradlew
-        # Verifica se o jar existe
-        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-          echo "ERRO: gradle-wrapper.jar não foi criado!"
-          exit 1
-        fi
-        echo "✅ gradle-wrapper.jar verificado"
+        ls -la gradle/wrapper/
       
     - name: Build with Gradle
       run: |
