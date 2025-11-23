@@ -345,15 +345,21 @@ class TuyaClient(private val context: Context? = null) {
                 log("[UDP] ⚠️ AVISO: IP é multicast - não vai funcionar!")
             }
             
-            val packet = DatagramPacket(data, data.size, address, port)
-            log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
-            log("[UDP] Primeiros 32 bytes do pacote: ${data.take(32).joinToString(" ") { "%02X".format(it) }}")
+            // Verifica se o socket foi criado corretamente
+            if (socket == null) {
+                log("[UDP] ❌ ERRO: Socket é null!")
+                return null
+            }
             
             // Verifica se o socket está conectado e pronto
             if (socket.isClosed) {
                 log("[UDP] ❌ ERRO: Socket está fechado!")
                 return null
             }
+            
+            val packet = DatagramPacket(data, data.size, address, port)
+            log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
+            log("[UDP] Primeiros 32 bytes do pacote: ${data.take(32).joinToString(" ") { "%02X".format(it) }}")
             
             try {
                 socket.send(packet)
