@@ -166,14 +166,20 @@ class TuyaClient(private val context: Context? = null) {
             if (success) {
                 log("[OK] ✅ Comando enviado com sucesso e confirmado pelo dispositivo")
                 Result.success(Unit)
-            } else if (lastResponse != null) {
-                log("[OK] ✅ Comando enviado (resposta vazia, mas pacote foi enviado)")
-                Result.success(Unit)
             } else {
-                log("[ERROR] ❌ Comando enviado mas sem confirmação do dispositivo após todas as tentativas")
-                log("[ERROR] Verifique: IP correto ($lanIp), Local Key correta, dispositivo na mesma rede")
+                log("[ERROR] ❌ Comando NÃO foi confirmado pelo dispositivo após todas as tentativas")
+                log("[ERROR] Detalhes:")
+                log("[ERROR]   - IP: $lanIp")
+                log("[ERROR]   - Device ID: $deviceId")
+                log("[ERROR]   - Protocolo tentado: $protocolVersion")
+                log("[ERROR]   - Última resposta: ${if (lastResponse != null) "recebida mas vazia" else "nenhuma resposta"}")
+                log("[ERROR] Possíveis causas:")
+                log("[ERROR]   1. IP incorreto ou dispositivo offline")
+                log("[ERROR]   2. Local Key incorreta")
+                log("[ERROR]   3. Dispositivo em outra rede")
+                log("[ERROR]   4. Formato do pacote incompatível com o dispositivo")
                 // Retorna falha para que o usuário saiba que não funcionou
-                Result.failure(RuntimeException("Timeout: dispositivo não respondeu após todas as tentativas. Verifique IP, Local Key e rede."))
+                Result.failure(RuntimeException("Falha: dispositivo não respondeu. Verifique IP ($lanIp), Local Key e se o dispositivo está na mesma rede."))
             }
             
         } catch (e: Exception) {
@@ -310,21 +316,7 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             log("[UDP] Endereço resolvido: ${address.hostAddress}")
-            log("[UDP] Verificando se endereço é alcançável...")
-            
-            // Verifica se o endereço é alcançável (pode demorar, então fazemos timeout curto)
-            val isReachable = try {
-                address.isReachable(1000) // 1 segundo de timeout
-            } catch (e: Exception) {
-                log("[UDP] ⚠️ Não foi possível verificar se endereço é alcançável: ${e.message}")
-                true // Assume que é alcançável se não conseguir verificar
-            }
-            
-            if (!isReachable) {
-                log("[UDP] ⚠️ Endereço não parece ser alcançável, mas tentando enviar mesmo assim...")
-            } else {
-                log("[UDP] ✅ Endereço parece ser alcançável")
-            }
+            log("[UDP] Socket local: ${socket.localAddress?.hostAddress}:${socket.localPort}")
             
             val packet = DatagramPacket(data, data.size, address, port)
             log("[UDP] Enviando pacote para ${address.hostAddress}:$port (${data.size} bytes)")
@@ -345,10 +337,15 @@ class TuyaClient(private val context: Context? = null) {
                 log("[UDP] Hex da resposta: ${buffer.take(responsePacket.length).joinToString(" ") { "%02X".format(it) }}")
                 return buffer.copyOf(responsePacket.length)
             } catch (e: java.net.SocketTimeoutException) {
-                // Timeout é aceitável para comandos (alguns dispositivos não respondem)
-                log("[UDP] ⏱️ Timeout ao receber resposta (normal para alguns comandos Tuya)")
-                log("[UDP] Nota: Alguns dispositivos Tuya não enviam resposta de confirmação")
-                return ByteArray(0) // Retorna array vazio indicando que o pacote foi enviado
+                // Timeout - dispositivo não respondeu
+                log("[UDP] ⏱️ Timeout ao receber resposta após ${TIMEOUT_MS}ms")
+                log("[UDP] ⚠️ Dispositivo não respondeu - pode ser que:")
+                log("[UDP]   1. O pacote não foi recebido pelo dispositivo")
+                log("[UDP]   2. O formato do pacote está incorreto")
+                log("[UDP]   3. A chave local está incorreta")
+                log("[UDP]   4. O dispositivo está offline ou em outra rede")
+                // Retorna null para indicar que não houve resposta
+                return null
             }
             
         } catch (e: java.net.UnknownHostException) {
