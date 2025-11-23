@@ -712,9 +712,14 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             // Verifica se é um pacote Tuya válido
-            val prefix = (data[0].toInt() shl 24) or (data[1].toInt() shl 16) or (data[2].toInt() shl 8) or data[3].toInt()
-            if (prefix != 0x000055AA) {
-                log("[DISCOVERY] Prefix inválido: 0x${prefix.toString(16)}")
+            // Prefix deve ser: 55 AA 00 00 (bytes na ordem específica)
+            val prefixByte0 = data[0].toInt() and 0xFF
+            val prefixByte1 = data[1].toInt() and 0xFF
+            val prefixByte2 = data[2].toInt() and 0xFF
+            val prefixByte3 = data[3].toInt() and 0xFF
+            
+            if (prefixByte0 != 0x55 || prefixByte1 != 0xAA || prefixByte2 != 0x00 || prefixByte3 != 0x00) {
+                log("[DISCOVERY] Prefix inválido: ${"%02X %02X %02X %02X".format(prefixByte0, prefixByte1, prefixByte2, prefixByte3)} (esperado: 55 AA 00 00)")
                 return null
             }
             
