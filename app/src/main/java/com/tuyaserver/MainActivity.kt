@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -38,7 +39,10 @@ class MainActivity : AppCompatActivity() {
         startButton.setOnClickListener {
             try {
                 val intent = Intent(this, TuyaServerService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // Android 14+ requer tipo de foreground service
+                    startForegroundService(intent, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(intent)
                 } else {
                     startService(intent)
@@ -111,7 +115,9 @@ class MainActivity : AppCompatActivity() {
                     // Reinicia o serviço para aplicar nova configuração
                     val intent = Intent(this, TuyaServerService::class.java)
                     stopService(intent)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        startForegroundService(intent, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(intent)
                     } else {
                         startService(intent)
