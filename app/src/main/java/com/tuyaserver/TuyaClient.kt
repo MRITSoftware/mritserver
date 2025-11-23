@@ -502,7 +502,6 @@ class TuyaClient(private val context: Context? = null) {
             
             // Recebe respostas até o timeout
             val startTime = System.currentTimeMillis()
-            var lastReceiveTime = startTime
             while (System.currentTimeMillis() - startTime < DISCOVERY_TIMEOUT_MS) {
                 try {
                     val remainingTime = DISCOVERY_TIMEOUT_MS - (System.currentTimeMillis() - startTime)
@@ -512,7 +511,6 @@ class TuyaClient(private val context: Context? = null) {
                     val responsePacket = DatagramPacket(buffer, buffer.size)
                     socket.soTimeout = remainingTime.coerceAtLeast(500) // Mínimo 500ms
                     socket.receive(responsePacket)
-                    lastReceiveTime = System.currentTimeMillis()
                     
                     val deviceIp = responsePacket.address.hostAddress ?: continue
                     log("[DISCOVERY] Resposta recebida de $deviceIp: ${responsePacket.length} bytes")
