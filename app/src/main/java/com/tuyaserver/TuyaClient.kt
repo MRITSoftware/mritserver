@@ -335,6 +335,11 @@ class TuyaClient(private val context: Context? = null) {
             }
             
             log("[UDP] Endereço resolvido: ${address.hostAddress}")
+            // Verifica se o socket foi criado corretamente antes de usar
+            if (socket == null) {
+                log("[UDP] ❌ ERRO: Socket é null!")
+                return null
+            }
             log("[UDP] Socket local: ${socket.localAddress?.hostAddress}:${socket.localPort}")
             
             // Verifica se o IP é válido e está na mesma rede
