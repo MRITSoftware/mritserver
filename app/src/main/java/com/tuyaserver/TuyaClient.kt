@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -17,6 +18,7 @@ import java.security.MessageDigest
 /**
  * Cliente Tuya nativo para Android
  * Implementa protocolo 3.4 baseado no tinytuya Python
+ * Replica exatamente o comportamento do tinytuya.OutletDevice
  */
 class TuyaClient(private val context: Context? = null) {
     
@@ -28,6 +30,7 @@ class TuyaClient(private val context: Context? = null) {
     
     /**
      * Envia comando para dispositivo Tuya usando protocolo 3.4
+     * Replica o comportamento do tinytuya.OutletDevice.turn_on() / turn_off()
      */
     suspend fun sendCommand(
         action: String,
@@ -51,50 +54,54 @@ class TuyaClient(private val context: Context? = null) {
         }
         
         try {
-            Log.d(TAG, "[INFO] Enviando '$action' → $deviceId @ $lanIp")
+            Log.d(TAG, "[INFO] Enviando '$action' → $deviceId @ $lanIp (protocolo 3.4)")
             
-            // Cria payload JSON
-            val dps = if (action == "on") {
-                mapOf("1" to true)  // DPS 1 = power on
-            } else {
-                mapOf("1" to false) // DPS 1 = power off
-            }
-            
-            // Protocolo 3.4 requer timestamp no payload
+            // Protocolo 3.4: cria payload com timestamp
             val timestamp = (System.currentTimeMillis() / 1000).toInt()
-            val jsonCommand = "{\"t\":$timestamp,\"dps\":{\"1\":${if (action == "on") "true" else "false"}}}"
+            val dpsValue = if (action == "on") 1 else 0
             
-            Log.d(TAG, "[DEBUG] JSON payload: $jsonCommand")
+            // Formato JSON exato do tinytuya para protocolo 3.4
+            val jsonCommand = "{\"t\":$timestamp,\"dps\":{\"1\":$dpsValue}}"
+            
+            Log.d(TAG, "[DEBUG] JSON: $jsonCommand")
             
             // Criptografa payload
             val payload = jsonCommand.toByteArray(Charsets.UTF_8)
-            Log.d(TAG, "[DEBUG] Payload antes de criptografar (${payload.size} bytes): ${payload.joinToString(" ") { "%02X".format(it) }}")
-            
             val encrypted = encrypt(payload, localKey)
-            Log.d(TAG, "[DEBUG] Payload criptografado (${encrypted.size} bytes): ${encrypted.take(32).joinToString(" ") { "%02X".format(it) }}...")
             
-            // Cria pacote Tuya 3.4
-            val packet = buildPacket(encrypted, timestamp)
+            // Tenta múltiplas vezes (como tinytuya faz)
+            var success = false
+            for (attempt in 1..3) {
+                Log.d(TAG, "[INFO] Tentativa $attempt de 3")
+                
+                // Tenta com sequence = timestamp (protocolo 3.4)
+                val packet1 = buildPacket(encrypted, timestamp, useTimestamp = true)
+                val response1 = sendUdpPacket(lanIp, PORT, packet1)
+                if (response1 != null && response1.isNotEmpty()) {
+                    Log.d(TAG, "[OK] ✅ Comando enviado com sucesso (tentativa $attempt, sequence=timestamp)")
+                    success = true
+                    break
+                }
+                
+                delay(200)
+                
+                // Tenta com sequence = 0
+                val packet2 = buildPacket(encrypted, 0, useTimestamp = false)
+                val response2 = sendUdpPacket(lanIp, PORT, packet2)
+                if (response2 != null && response2.isNotEmpty()) {
+                    Log.d(TAG, "[OK] ✅ Comando enviado com sucesso (tentativa $attempt, sequence=0)")
+                    success = true
+                    break
+                }
+                
+                delay(200)
+            }
             
-            // Log detalhado do pacote
-            Log.d(TAG, "[DEBUG] Pacote completo (${packet.size} bytes):")
-            Log.d(TAG, "[DEBUG] Primeiros 32 bytes: ${packet.take(32).joinToString(" ") { "%02X".format(it) }}")
-            Log.d(TAG, "[DEBUG] Prefix (bytes 0-3): ${packet.take(4).joinToString(" ") { "%02X".format(it) }}")
-            Log.d(TAG, "[DEBUG] Version (bytes 4-7): ${packet.slice(4..7).joinToString(" ") { "%02X".format(it) }}")
-            Log.d(TAG, "[DEBUG] Command (bytes 8-11): ${packet.slice(8..11).joinToString(" ") { "%02X".format(it) }}")
-            Log.d(TAG, "[DEBUG] Length (bytes 12-15): ${packet.slice(12..15).joinToString(" ") { "%02X".format(it) }} (valor: ${encrypted.size})")
-            Log.d(TAG, "[DEBUG] Sequence (bytes 16-19): ${packet.slice(16..19).joinToString(" ") { "%02X".format(it) }} (timestamp: $timestamp)")
-            Log.d(TAG, "[DEBUG] Suffix (últimos 4 bytes): ${packet.takeLast(4).joinToString(" ") { "%02X".format(it) }}")
-            
-            // Envia via UDP
-            val response = sendUdpPacket(lanIp, PORT, packet)
-            
-            if (response != null && response.isNotEmpty()) {
-                Log.d(TAG, "[OK] Comando enviado com sucesso")
+            if (success) {
                 Result.success(Unit)
             } else {
-                Log.e(TAG, "[ERRO] Dispositivo não respondeu")
-                Result.failure(RuntimeException("Dispositivo não respondeu. Verifique IP, Local Key e se está na mesma rede."))
+                Log.e(TAG, "[ERRO] Dispositivo não respondeu após 3 tentativas")
+                Result.failure(RuntimeException("Dispositivo não respondeu. Verifique IP ($lanIp), Local Key e se está na mesma rede."))
             }
             
         } catch (e: Exception) {
@@ -105,13 +112,9 @@ class TuyaClient(private val context: Context? = null) {
     
     /**
      * Constrói pacote Tuya protocolo 3.4
-     * Formato baseado no tinytuya Python
-     * Header: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) = 24 bytes
-     * + payload criptografado + suffix(4)
-     * 
-     * IMPORTANTE: Tuya usa BIG-ENDIAN para inteiros no header (não little-endian!)
+     * Formato baseado no tinytuya Python (big-endian para inteiros)
      */
-    private fun buildPacket(encryptedPayload: ByteArray, sequence: Int): ByteArray {
+    private fun buildPacket(encryptedPayload: ByteArray, sequence: Int, useTimestamp: Boolean): ByteArray {
         val headerSize = 24
         val suffixSize = 4
         val totalSize = headerSize + encryptedPayload.size + suffixSize
@@ -120,69 +123,59 @@ class TuyaClient(private val context: Context? = null) {
         var offset = 0
         
         // Prefix: 0x000055AA (BIG-ENDIAN: 00 00 55 AA)
-        val prefixBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(0x000055AA)
-        }.array()
-        System.arraycopy(prefixBytes, 0, packet, offset, 4)
-        offset += 4
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x55.toByte()
+        packet[offset++] = 0xAA.toByte()
         
-        // Version: 0x00000000 (protocolo 3.4 ainda usa 0 no header)
-        val versionBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(0x00000000)
-        }.array()
-        System.arraycopy(versionBytes, 0, packet, offset, 4)
-        offset += 4
+        // Version: 0x00000000
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
         
         // Command: 0x0000000D (CONTROL)
-        val commandBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(0x0000000D)
-        }.array()
-        System.arraycopy(commandBytes, 0, packet, offset, 4)
-        offset += 4
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x0D.toByte()
         
         // Length: tamanho do payload (BIG-ENDIAN)
-        val lengthBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(encryptedPayload.size)
-        }.array()
-        System.arraycopy(lengthBytes, 0, packet, offset, 4)
-        offset += 4
+        val length = encryptedPayload.size
+        packet[offset++] = ((length shr 24) and 0xFF).toByte()
+        packet[offset++] = ((length shr 16) and 0xFF).toByte()
+        packet[offset++] = ((length shr 8) and 0xFF).toByte()
+        packet[offset++] = (length and 0xFF).toByte()
         
-        // Sequence: timestamp (BIG-ENDIAN)
-        val sequenceBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(sequence)
-        }.array()
-        System.arraycopy(sequenceBytes, 0, packet, offset, 4)
-        offset += 4
+        // Sequence: timestamp ou 0 (BIG-ENDIAN)
+        val seq = if (useTimestamp) sequence else 0
+        packet[offset++] = ((seq shr 24) and 0xFF).toByte()
+        packet[offset++] = ((seq shr 16) and 0xFF).toByte()
+        packet[offset++] = ((seq shr 8) and 0xFF).toByte()
+        packet[offset++] = (seq and 0xFF).toByte()
         
         // Return code: 0x00000000
-        val returnCodeBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(0x00000000)
-        }.array()
-        System.arraycopy(returnCodeBytes, 0, packet, offset, 4)
-        offset += 4
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
         
         // Payload criptografado
         System.arraycopy(encryptedPayload, 0, packet, offset, encryptedPayload.size)
         offset += encryptedPayload.size
         
         // Suffix: 0x0000AA55 (BIG-ENDIAN: 00 00 AA 55)
-        val suffixBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
-            putInt(0x0000AA55)
-        }.array()
-        System.arraycopy(suffixBytes, 0, packet, offset, 4)
+        packet[offset++] = 0x00
+        packet[offset++] = 0x00
+        packet[offset++] = 0xAA.toByte()
+        packet[offset++] = 0x55.toByte()
         
         return packet
     }
     
     /**
      * Criptografa payload usando AES-128-ECB
+     * Replica exatamente o comportamento do tinytuya
      */
     private fun encrypt(data: ByteArray, key: String): ByteArray {
         // Tuya usa MD5 da chave para ter exatamente 16 bytes
@@ -195,14 +188,12 @@ class TuyaClient(private val context: Context? = null) {
         val secretKey = SecretKeySpec(keyHash, "AES")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey)
         
-        // Padding manual para múltiplo de 16
-        val paddedData = if (data.size % 16 != 0) {
-            val padding = 16 - (data.size % 16)
-            ByteArray(data.size + padding) { i ->
-                if (i < data.size) data[i] else padding.toByte()
-            }
-        } else {
-            data
+        // Padding PKCS7 manual (múltiplo de 16)
+        val padding = 16 - (data.size % 16)
+        val paddedData = ByteArray(data.size + padding)
+        System.arraycopy(data, 0, paddedData, 0, data.size)
+        for (i in data.size until paddedData.size) {
+            paddedData[i] = padding.toByte()
         }
         
         return cipher.doFinal(paddedData)
@@ -236,7 +227,6 @@ class TuyaClient(private val context: Context? = null) {
             val address = InetAddress.getByName(ip)
             val packet = DatagramPacket(data, data.size, address, port)
             
-            Log.d(TAG, "[UDP] Enviando ${data.size} bytes para $ip:$port")
             socket.send(packet)
             
             // Tenta receber resposta
@@ -247,10 +237,9 @@ class TuyaClient(private val context: Context? = null) {
                 socket.receive(responsePacket)
                 val response = ByteArray(responsePacket.length)
                 System.arraycopy(buffer, 0, response, 0, responsePacket.length)
-                Log.d(TAG, "[UDP] Resposta recebida: ${response.size} bytes")
+                Log.d(TAG, "[UDP] ✅ Resposta recebida: ${response.size} bytes de ${responsePacket.address.hostAddress}")
                 return response
             } catch (e: java.net.SocketTimeoutException) {
-                Log.w(TAG, "[UDP] Timeout aguardando resposta")
                 return null
             }
             
@@ -263,4 +252,3 @@ class TuyaClient(private val context: Context? = null) {
         }
     }
 }
-
