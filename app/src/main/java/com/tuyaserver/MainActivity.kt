@@ -34,14 +34,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var siteNameText: TextView
     private lateinit var ipText: TextView
     private lateinit var ipContainer: LinearLayout
-    private lateinit var tuyaClient: TuyaClient
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
         configManager = ConfigManager(this)
-        tuyaClient = TuyaClient(this) // Passa o contexto para usar MulticastLock
         
         statusText = findViewById(R.id.statusText)
         siteNameText = findViewById(R.id.siteNameText)
@@ -306,156 +304,6 @@ class MainActivity : AppCompatActivity() {
             .create()
         
         dialog.show()
-    }
-    
-    private fun discoverTuyaDevices(deviceIdInput: EditText, lanIpInput: EditText) {
-        // Mostra opções de descoberta
-        AlertDialog.Builder(this)
-            .setTitle("Descobrir Dispositivo Tuya")
-            .setMessage("Escolha o método de descoberta:")
-            .setPositiveButton("🔍 Buscar na Rede") { _, _ ->
-                discoverByBroadcast(deviceIdInput, lanIpInput)
-            }
-            .setNeutralButton("📡 Escanear IPs") { _, _ ->
-                discoverByScanning(deviceIdInput, lanIpInput)
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-    
-    private fun discoverByBroadcast(deviceIdInput: EditText, lanIpInput: EditText) {
-        Toast.makeText(this, "🔍 Procurando dispositivos Tuya na rede (broadcast)...", Toast.LENGTH_SHORT).show()
-        
-        activityScope.launch(Dispatchers.IO) {
-            try {
-                val devices = tuyaClient.discoverDevices()
-                
-                withContext(Dispatchers.Main) {
-                    if (devices.isEmpty()) {
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Nenhum Dispositivo Encontrado")
-                            .setMessage("A descoberta por broadcast não encontrou dispositivos.\n\nPossíveis causas:\n• Firewall bloqueando broadcast\n• Dispositivo não responde a descoberta\n• Roteador bloqueando UDP\n\nTente:\n• Escanear IPs da rede\n• Preencher manualmente")
-                            .setPositiveButton("📡 Escanear IPs") { _, _ ->
-                                discoverByScanning(deviceIdInput, lanIpInput)
-                            }
-                            .setNegativeButton("OK", null)
-                            .show()
-                    } else {
-                        // Mostra lista de dispositivos para selecionar
-                        val deviceNames = devices.mapIndexed { index, device ->
-                            if (device.deviceId != "unknown") {
-                                "${device.deviceId.take(8)}... @ ${device.ip}"
-                            } else {
-                                "Dispositivo @ ${device.ip}"
-                            }
-                        }.toTypedArray()
-                        
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Dispositivos Encontrados (${devices.size})")
-                            .setItems(deviceNames) { _, which ->
-                                val selectedDevice = devices[which]
-                                deviceIdInput.setText(selectedDevice.deviceId)
-                                lanIpInput.setText(selectedDevice.ip)
-                                Toast.makeText(this@MainActivity, "✅ Dispositivo selecionado!", Toast.LENGTH_SHORT).show()
-                            }
-                            .setNegativeButton("Cancelar", null)
-                            .show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "❌ Erro ao descobrir: ${e.message}", Toast.LENGTH_LONG).show()
-                    android.util.Log.e("MainActivity", "Erro ao descobrir dispositivos", e)
-                }
-            }
-        }
-    }
-    
-    private fun discoverByScanning(deviceIdInput: EditText, lanIpInput: EditText) {
-        val localIp = getLocalIpAddress()
-        if (localIp == "Não disponível") {
-            Toast.makeText(this, "❌ IP não disponível para escanear", Toast.LENGTH_SHORT).show()
-            return
-        }
-        
-        // Extrai o prefixo da rede (ex: 192.168.1)
-        val ipParts = localIp.split(".")
-        if (ipParts.size != 4) {
-            Toast.makeText(this, "❌ Formato de IP inválido", Toast.LENGTH_SHORT).show()
-            return
-        }
-        
-        val networkPrefix = "${ipParts[0]}.${ipParts[1]}.${ipParts[2]}"
-        
-        AlertDialog.Builder(this)
-            .setTitle("Escanear Rede")
-            .setMessage("Isso vai tentar descobrir dispositivos Tuya escaneando IPs da rede.\n\nRede: $networkPrefix.x\n\nIsso pode demorar alguns minutos.\n\nDeseja continuar?")
-            .setPositiveButton("Escanear") { _, _ ->
-                scanNetworkForTuyaDevices(networkPrefix, deviceIdInput, lanIpInput)
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-    
-    private fun scanNetworkForTuyaDevices(networkPrefix: String, deviceIdInput: EditText, lanIpInput: EditText) {
-        Toast.makeText(this, "📡 Escaneando rede $networkPrefix.x...\nIsso pode demorar alguns minutos", Toast.LENGTH_LONG).show()
-        
-        activityScope.launch(Dispatchers.IO) {
-            val foundDevices = mutableListOf<TuyaClient.DiscoveredDevice>()
-            
-            try {
-                // Escaneia IPs de 1 a 254
-                for (i in 1..254) {
-                    val ip = "$networkPrefix.$i"
-                    
-                    // Tenta descobrir se é um dispositivo Tuya
-                    val device = tuyaClient.probeDevice(ip)
-                    if (device != null) {
-                        foundDevices.add(device)
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@MainActivity, "✅ Encontrado: ${device.ip}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    
-                    // Mostra progresso a cada 50 IPs
-                    if (i % 50 == 0) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@MainActivity, "📡 Escaneando... $i/254", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-                
-                withContext(Dispatchers.Main) {
-                    if (foundDevices.isEmpty()) {
-                        Toast.makeText(this@MainActivity, "❌ Nenhum dispositivo Tuya encontrado no escaneamento", Toast.LENGTH_LONG).show()
-                    } else {
-                        val deviceNames = foundDevices.map { device ->
-                            if (device.deviceId != "unknown") {
-                                "${device.deviceId.take(8)}... @ ${device.ip}"
-                            } else {
-                                "Dispositivo @ ${device.ip}"
-                            }
-                        }.toTypedArray()
-                        
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Dispositivos Encontrados (${foundDevices.size})")
-                            .setItems(deviceNames) { _, which ->
-                                val selectedDevice = foundDevices[which]
-                                deviceIdInput.setText(selectedDevice.deviceId)
-                                lanIpInput.setText(selectedDevice.ip)
-                                Toast.makeText(this@MainActivity, "✅ Dispositivo selecionado!", Toast.LENGTH_SHORT).show()
-                            }
-                            .setNegativeButton("Cancelar", null)
-                            .show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "❌ Erro ao escanear: ${e.message}", Toast.LENGTH_LONG).show()
-                    android.util.Log.e("MainActivity", "Erro ao escanear rede", e)
-                }
-            }
-        }
     }
     
     private fun sendTuyaCommand(action: String, deviceId: String, localKey: String, lanIp: String) {
