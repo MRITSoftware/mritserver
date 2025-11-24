@@ -47,7 +47,7 @@
                 android:layout_height="wrap_content"
                 android:hint="API Key"
                 android:layout_marginBottom="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/apiKeyInput"
@@ -62,7 +62,7 @@
                 android:layout_height="wrap_content"
                 android:hint="API Secret"
                 android:layout_marginBottom="24dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/apiSecretInput"
