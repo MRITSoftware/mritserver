@@ -60,6 +60,9 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     
+    // Servidor HTTP embutido
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    
     // JSON (já incluído no Android, mas explícito para clareza)
     // org.json está incluído no Android SDK
     

@@ -11,8 +11,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.mritsoftware.mritserver.adapter.DeviceAdapter
 import com.mritsoftware.mritserver.model.TuyaDevice
-import com.mritsoftware.mritserver.service.FlaskService
+import com.mritsoftware.mritserver.service.ServerService
 import com.mritsoftware.mritserver.ui.SettingsActivity
+import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,20 +28,40 @@ class MainActivity : AppCompatActivity() {
     private lateinit var refreshButton: MaterialButton
     
     private val devices = mutableListOf<TuyaDevice>()
-    private lateinit var flaskService: FlaskService
+    private lateinit var serverService: ServerService
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
-        flaskService = FlaskService(this)
-        
         setupToolbar()
         setupViews()
         setupRecyclerView()
         setupListeners()
-        checkServerConnection()
+        startServerService()
+        loadSampleDevices()
+    }
+    
+    private fun startServerService() {
+        val intent = Intent(this, ServerService::class.java)
+        startService(intent)
+        
+        // Atualizar status após um pequeno delay para o servidor iniciar
+        coroutineScope.launch {
+            kotlinx.coroutines.delay(1000)
+            updateServerStatus()
+        }
+    }
+    
+    private fun updateServerStatus() {
+        gatewayStatus.text = "Servidor rodando na porta 8000"
+        gatewayStatus.setTextColor(getColor(R.color.teal_700))
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Não parar o serviço aqui - deixar rodando em background
     }
     
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -59,40 +80,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun checkServerConnection() {
-        coroutineScope.launch {
-            try {
-                val isConnected = withContext(Dispatchers.IO) {
-                    flaskService.checkServerHealth()
-                }
-                
-                if (isConnected) {
-                    val siteInfo = withContext(Dispatchers.IO) {
-                        flaskService.getSiteInfo()
-                    }
-                    gatewayStatus.text = "Conectado"
-                    if (siteInfo != null) {
-                        gatewayStatus.text = "Conectado - $siteInfo"
-                    }
-                    gatewayStatus.setTextColor(getColor(R.color.teal_700))
-                    loadSampleDevices() // Por enquanto usa dados de exemplo
-                } else {
-                    gatewayStatus.text = "Desconectado"
-                    gatewayStatus.setTextColor(getColor(android.R.color.holo_red_dark))
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Servidor Flask não encontrado. Configure em Configurações.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    loadSampleDevices()
-                }
-            } catch (e: Exception) {
-                gatewayStatus.text = "Erro de conexão"
-                gatewayStatus.setTextColor(getColor(android.R.color.holo_red_dark))
-                loadSampleDevices()
-            }
-        }
-    }
     
     private fun setupToolbar() {
         val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
@@ -172,8 +159,6 @@ class MainActivity : AppCompatActivity() {
     private fun onDeviceToggle(device: TuyaDevice, isOn: Boolean) {
         coroutineScope.launch {
             try {
-                // Buscar local_key do dispositivo (por enquanto usa um valor padrão)
-                // TODO: Armazenar local_key de cada dispositivo
                 val localKey = getLocalKeyForDevice(device.id)
                 
                 if (localKey == null) {
@@ -187,13 +172,14 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
                 
+                // Enviar comando via HTTP para o servidor local
                 val action = if (isOn) "on" else "off"
                 val success = withContext(Dispatchers.IO) {
-                    flaskService.sendCommand(
+                    sendCommandToLocalServer(
                         deviceId = device.id,
                         localKey = localKey,
                         action = action,
-                        lanIp = null // "auto" será usado
+                        lanIp = device.lanIp ?: "auto"
                     )
                 }
                 
@@ -218,6 +204,43 @@ class MainActivity : AppCompatActivity() {
                 deviceAdapter.notifyDataSetChanged()
                 Toast.makeText(this@MainActivity, "Erro: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+    
+    private fun sendCommandToLocalServer(
+        deviceId: String,
+        localKey: String,
+        action: String,
+        lanIp: String
+    ): Boolean {
+        return try {
+            val url = java.net.URL("http://127.0.0.1:8000/tuya/command")
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 3000
+            connection.readTimeout = 3000
+            
+            val jsonBody = org.json.JSONObject().apply {
+                put("action", action)
+                put("tuya_device_id", deviceId)
+                put("local_key", localKey)
+                put("lan_ip", lanIp)
+            }
+            
+            val outputStream = connection.outputStream
+            val writer = java.io.OutputStreamWriter(outputStream, "UTF-8")
+            writer.write(jsonBody.toString())
+            writer.flush()
+            writer.close()
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            
+            responseCode == 200
+        } catch (e: Exception) {
+            false
         }
     }
     
