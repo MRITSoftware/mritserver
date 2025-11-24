@@ -235,10 +235,16 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 10)
         }
         
+        // Credenciais padrão que funcionam no Python
+        val DEFAULT_DEVICE_ID = "ebc88ff6742c662021fpza"
+        val DEFAULT_LOCAL_KEY = "@>}E^>HXny4}UYn;"
+        val DEFAULT_IP = "192.168.0.193"
+        
         // Ação sempre será "on" (ligar), não precisa de campo
         
         val deviceIdInput = EditText(this).apply {
             hint = "Device ID do Tuya"
+            setText(DEFAULT_DEVICE_ID) // Preenche com credencial padrão
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -249,6 +255,7 @@ class MainActivity : AppCompatActivity() {
         
         val localKeyInput = EditText(this).apply {
             hint = "Local Key do Tuya"
+            setText(DEFAULT_LOCAL_KEY) // Preenche com credencial padrão
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -258,8 +265,21 @@ class MainActivity : AppCompatActivity() {
         }
         
         val localIp = getLocalIpAddress()
+        // Tenta detectar IP da rede local (mesma sub-rede)
+        val detectedIp = if (localIp != "Não disponível") {
+            val ipParts = localIp.split(".")
+            if (ipParts.size == 4) {
+                "${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.193" // Usa .193 como padrão
+            } else {
+                DEFAULT_IP
+            }
+        } else {
+            DEFAULT_IP
+        }
+        
         val lanIpInput = EditText(this).apply {
-            hint = "IP do dispositivo Tuya na rede local (ex: 192.168.0.193)"
+            hint = "IP do dispositivo Tuya na rede local"
+            setText(detectedIp) // Preenche com IP detectado ou padrão
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -272,7 +292,7 @@ class MainActivity : AppCompatActivity() {
         
         val dialog = AlertDialog.Builder(this)
             .setTitle("Comando Tuya - Ligar")
-            .setMessage("Preencha os dados do dispositivo Tuya:\n\n• Device ID: ID do dispositivo\n• Local Key: Chave local\n• IP: IP do dispositivo Tuya na rede local\n\n⚠️ IMPORTANTE: Use o IP do dispositivo Tuya (ex: 192.168.0.193), NÃO o IP do Android (${if (localIp != "Não disponível") localIp else "seu IP"})")
+            .setMessage("Credenciais padrão pré-preenchidas (funcionam no Python).\n\nVocê pode alterar o IP se necessário.\n\n• Device ID: ID do dispositivo\n• Local Key: Chave local\n• IP: IP do dispositivo Tuya na rede local\n\n⚠️ IMPORTANTE: Use o IP do dispositivo Tuya, NÃO o IP do Android (${if (localIp != "Não disponível") localIp else "seu IP"})")
             .setView(layout)
             .setPositiveButton("Enviar") { _, _ ->
                 val deviceId = deviceIdInput.text.toString().trim()
