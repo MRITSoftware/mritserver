@@ -177,7 +177,8 @@ def send_tuya_command(
     action: str,
     tuya_device_id: str,
     local_key: str,
-    lan_ip: Optional[str]
+    lan_ip: Optional[str],
+    version: Optional[float] = None
 ) -> None:
     
     if not tuya_device_id:
@@ -197,12 +198,16 @@ def send_tuya_command(
     if lan_ip.startswith("http://") or lan_ip.startswith("https://"):
         raise RuntimeError("lan_ip deve ser apenas o IP (ex: 192.168.0.50), sem http:// e sem porta.")
     
-    log(f"[INFO] [{SITE_NAME}] Enviando '{action}' → {tuya_device_id} @ {lan_ip}")
+    # Se não veio version ou veio vazio, usa 3.3 como padrão
+    if version is None or version == "":
+        version = 3.3
+    
+    log(f"[INFO] [{SITE_NAME}] Enviando '{action}' → {tuya_device_id} @ {lan_ip} (versão {version})")
     
     d = tinytuya.OutletDevice(tuya_device_id, lan_ip, local_key)
     
-    # Usar apenas protocolo 3.4
-    d.set_version(3.4)
+    # Usa a versão recebida do JSON ou 3.3 como padrão
+    d.set_version(version)
     
     if action == "on":
         resp = d.turn_on()
@@ -232,15 +237,24 @@ def api_tuya_command():
         tuya_device_id = data.get("tuya_device_id")
         local_key = data.get("local_key")
         lan_ip = data.get("lan_ip")  # pode vir None, vazio ou "auto"
+        version = data.get("version")  # pode vir None, vazio ou um número (ex: 3.3, 3.4)
         
         if action not in ("on", "off"):
             return jsonify({"ok": False, "error": "action deve ser 'on' ou 'off'"}), 400
+        
+        # Converte version para float se vier como string
+        if version is not None and version != "":
+            try:
+                version = float(version)
+            except (ValueError, TypeError):
+                version = None
         
         send_tuya_command(
             action=action,
             tuya_device_id=tuya_device_id,
             local_key=local_key,
-            lan_ip=lan_ip
+            lan_ip=lan_ip,
+            version=version
         )
         
         return jsonify({"ok": True}), 200

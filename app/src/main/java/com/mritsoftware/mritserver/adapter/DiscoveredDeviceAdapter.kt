@@ -39,3 +39,4 @@ class DiscoveredDeviceAdapter(
     override fun getItemCount() = devices.size
 }
 
+
