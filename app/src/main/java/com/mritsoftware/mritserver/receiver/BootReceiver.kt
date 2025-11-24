@@ -16,69 +16,58 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "onReceive chamado com action: ${intent.action}")
         
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || 
+        // Verificar múltiplas ações de boot
+        val isBootAction = intent.action == Intent.ACTION_BOOT_COMPLETED || 
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
-            intent.action == "com.htc.intent.action.QUICKBOOT_POWERON") {
-            
+            intent.action == "com.htc.intent.action.QUICKBOOT_POWERON" ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+            intent.action == Intent.ACTION_PACKAGE_REPLACED
+        
+        if (isBootAction) {
             Log.d(TAG, "=== BOOT COMPLETADO DETECTADO ===")
             Log.d(TAG, "Package: ${context.packageName}")
             Log.d(TAG, "Android Version: ${Build.VERSION.SDK_INT}")
             
-            // Usar goAsync() para manter o receiver vivo enquanto processamos
-            val pendingResult = goAsync()
-            
+            // IMPORTANTE: Iniciar o serviço IMEDIATAMENTE, sem goAsync
+            // goAsync pode não funcionar em algumas versões do Android
             try {
-                // IMPORTANTE: O servidor SEMPRE inicia, mesmo com tela bloqueada
-                // Foreground services podem rodar mesmo quando o dispositivo está bloqueado
                 Log.d(TAG, "Iniciando PythonServerService...")
-                val serviceIntent = Intent(context, PythonServerService::class.java)
+                val serviceIntent = Intent(context, PythonServerService::class.java).apply {
+                    setPackage(context.packageName)
+                }
                 
-                try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    try {
                         context.startForegroundService(serviceIntent)
                         Log.d(TAG, "startForegroundService chamado com sucesso")
-                    } else {
+                    } catch (e: IllegalStateException) {
+                        // Se falhar, tentar startService
+                        Log.w(TAG, "startForegroundService falhou, tentando startService: ${e.message}")
                         context.startService(serviceIntent)
-                        Log.d(TAG, "startService chamado com sucesso")
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "ERRO ao iniciar serviço: ${e.message}", e)
-                }
-                
-                // Verificar se a tela está ligada/desbloqueada
-                val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-                val isScreenOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
-                    powerManager.isInteractive
                 } else {
-                    @Suppress("DEPRECATION")
-                    powerManager.isScreenOn
+                    context.startService(serviceIntent)
+                    Log.d(TAG, "startService chamado com sucesso")
                 }
-                
-                Log.d(TAG, "Tela está ${if (isScreenOn) "ligada" else "desligada/bloqueada"}")
-                
-                // Usar Handler em thread separada para não bloquear o receiver
-                Thread {
-                    try {
-                        // Aguardar 5 segundos para o servidor iniciar
-                        Thread.sleep(5000)
-                        Log.d(TAG, "Aguardou 5 segundos, tentando abrir apps...")
-                        
-                        // Tentar abrir mritserver
-                        try {
-                            val mritserverIntent = Intent(context, MainActivity::class.java).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            }
-                            context.startActivity(mritserverIntent)
-                            Log.d(TAG, "MainActivity (mritserver) aberta com sucesso")
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Não foi possível abrir mritserver: ${e.message}", e)
-                        }
-                        
-                        // Aguardar mais 2 segundos antes de abrir gelafitgo
-                        Thread.sleep(2000)
-                        
-                        // Tentar abrir gelafitgo
+            } catch (e: Exception) {
+                Log.e(TAG, "ERRO ao iniciar serviço: ${e.message}", e)
+                e.printStackTrace()
+            }
+            
+            // Usar Handler para abrir apps depois
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    // Abrir mritserver
+                    val mritserverIntent = Intent(context, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        setPackage(context.packageName)
+                    }
+                    context.startActivity(mritserverIntent)
+                    Log.d(TAG, "MainActivity (mritserver) aberta com sucesso")
+                    
+                    // Aguardar mais 2 segundos antes de abrir gelafitgo
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         try {
                             val gelafitgoIntent = context.packageManager.getLaunchIntentForPackage("com.mrit.gelafitgo")
                             if (gelafitgoIntent != null) {
@@ -92,18 +81,11 @@ class BootReceiver : BroadcastReceiver() {
                         } catch (e: Exception) {
                             Log.w(TAG, "Não foi possível abrir gelafitgo: ${e.message}", e)
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Erro na thread de abertura de apps: ${e.message}", e)
-                    } finally {
-                        // Finalizar o receiver
-                        pendingResult.finish()
-                    }
-                }.start()
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "ERRO CRÍTICO no BootReceiver: ${e.message}", e)
-                pendingResult.finish()
-            }
+                    }, 2000)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Não foi possível abrir mritserver: ${e.message}", e)
+                }
+            }, 5000) // Aguardar 5 segundos para o servidor iniciar
         } else {
             Log.d(TAG, "Action não reconhecido: ${intent.action}")
         }
