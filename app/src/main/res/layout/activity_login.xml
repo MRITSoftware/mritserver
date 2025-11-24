@@ -26,7 +26,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Gateway Tuya"
+                android:text="Gateway de Dispositivos"
                 android:textSize="28sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black"
@@ -83,7 +83,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Obtenha suas credenciais em:\nhttps://iot.tuya.com"
+                android:text="Configure suas credenciais de acesso"
                 android:textSize="12sp"
                 android:textColor="@android:color/darker_gray"
                 android:layout_gravity="center_horizontal"

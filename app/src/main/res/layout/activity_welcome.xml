@@ -37,7 +37,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Gateway Tuya"
+            android:text="Gateway de Dispositivos"
             android:textSize="18sp"
             android:textColor="@android:color/white"
             android:alpha="0.9"

@@ -61,7 +61,7 @@ class LoginActivity : AppCompatActivity() {
                 .putBoolean("is_logged_in", true)
                 .apply()
             
-            Toast.makeText(this, "Conectando ao Gateway Tuya...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Conectando ao Gateway...", Toast.LENGTH_SHORT).show()
             startMainActivity()
         }
     }

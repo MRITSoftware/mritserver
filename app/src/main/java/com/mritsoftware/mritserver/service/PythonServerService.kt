@@ -46,10 +46,10 @@ class PythonServerService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Servidor Tuya",
+                "Servidor",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Servidor Tuya rodando em background"
+                description = "Servidor rodando em background"
                 setShowBadge(false)
             }
             
@@ -67,7 +67,7 @@ class PythonServerService : Service() {
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("MRIT Server")
-            .setContentText("Servidor Tuya rodando na porta 8000")
+            .setContentText("Servidor rodando na porta 8000")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

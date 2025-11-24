@@ -79,7 +79,7 @@ class MainActivity : AppCompatActivity() {
                 connection.disconnect()
                 
                 if (responseCode == 200) {
-                    gatewayStatus.text = "Servidor Python rodando na porta 8000"
+                    gatewayStatus.text = "Servidor rodando na porta 8000"
                     gatewayStatus.setTextColor(getColor(R.color.teal_700))
                 } else {
                     gatewayStatus.text = "Servidor iniciando..."

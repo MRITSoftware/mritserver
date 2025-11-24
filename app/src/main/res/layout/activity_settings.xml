@@ -25,7 +25,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Servidor Flask"
+                android:text="Configurações"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black"
@@ -34,7 +34,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Configure o endereço do servidor Flask que controla os dispositivos Tuya"
+                android:text="Configure o nome deste site/tablet"
                 android:textSize="14sp"
                 android:textColor="@android:color/darker_gray"
                 android:layout_marginBottom="24dp" />
@@ -54,19 +54,12 @@
                     android:hint="Ex: GELAFIT_SP01" />
             </com.google.android.material.textfield.TextInputLayout>
             
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Servidor Python rodando em: http://0.0.0.0:8000"
-                android:textSize="12sp"
-                android:textColor="@android:color/darker_gray"
-                android:layout_marginBottom="16dp" />
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/testButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Testar Conexão"
+                android:textSize="18sp"
                 android:layout_marginBottom="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
@@ -75,6 +68,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Salvar"
+                android:textSize="18sp"
                 style="@style/Widget.Material3.Button" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
