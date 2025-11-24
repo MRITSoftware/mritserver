@@ -8,6 +8,21 @@ Este projeto é um aplicativo Android desenvolvido para funcionar como servidor/
 
 ## 🚀 Como Gerar o APK
 
+### ⚠️ Importante: Arquivo gradle-wrapper.jar
+
+Se você estiver fazendo build local, certifique-se de que o arquivo `gradle/wrapper/gradle-wrapper.jar` existe. Se não existir:
+
+1. **Baixe manualmente:**
+   - Acesse: https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar
+   - Salve o arquivo em: `gradle/wrapper/gradle-wrapper.jar`
+
+2. **Ou execute o script:**
+   ```powershell
+   .\download-wrapper.ps1
+   ```
+
+**Nota:** O GitHub Actions baixa automaticamente este arquivo durante o build, então não é necessário para builds no GitHub.
+
 ### Opção 1: GitHub Actions (Recomendado - Sem Android Studio)
 
 O projeto está configurado com GitHub Actions para gerar o APK automaticamente. Siga estes passos:

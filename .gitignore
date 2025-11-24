@@ -25,6 +25,8 @@ local.properties
 
 # Java class files
 *.class
+# Exception: gradle-wrapper.jar should be included
+!gradle/wrapper/gradle-wrapper.jar
 
 # Generated files
 bin/
