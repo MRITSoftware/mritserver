@@ -1,5 +1,7 @@
 package com.mritsoftware.mritserver.model
 
+import java.io.Serializable
+
 data class TuyaDevice(
     val id: String, // tuya_device_id (gwId)
     val name: String,
@@ -10,7 +12,7 @@ data class TuyaDevice(
     var isOn: Boolean = false,
     var brightness: Int = 100,
     var temperature: Int = 25
-) {
+) : Serializable {
     enum class DeviceType {
         LIGHT,
         SWITCH,

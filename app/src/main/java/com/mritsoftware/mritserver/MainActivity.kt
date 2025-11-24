@@ -14,6 +14,7 @@ import com.mritsoftware.mritserver.model.TuyaDevice
 import com.mritsoftware.mritserver.service.PythonServerService
 import com.mritsoftware.mritserver.ui.SettingsActivity
 import com.mritsoftware.mritserver.ui.DeviceDiscoveryActivity
+import com.mritsoftware.mritserver.ui.DeviceDetailsActivity
 import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,11 +127,23 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun setupRecyclerView() {
-        deviceAdapter = DeviceAdapter(devices) { device, isOn ->
-            onDeviceToggle(device, isOn)
-        }
+        deviceAdapter = DeviceAdapter(
+            devices,
+            onDeviceToggle = { device, isOn ->
+                onDeviceToggle(device, isOn)
+            },
+            onDeviceClick = { device ->
+                showDeviceDetails(device)
+            }
+        )
         devicesRecyclerView.layoutManager = LinearLayoutManager(this)
         devicesRecyclerView.adapter = deviceAdapter
+    }
+    
+    private fun showDeviceDetails(device: TuyaDevice) {
+        val intent = Intent(this, DeviceDetailsActivity::class.java)
+        intent.putExtra("device", device)
+        startActivity(intent)
     }
     
     private fun setupListeners() {

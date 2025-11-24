@@ -12,7 +12,8 @@ import com.mritsoftware.mritserver.model.TuyaDevice
 
 class DeviceAdapter(
     private val devices: MutableList<TuyaDevice>,
-    private val onDeviceToggle: (TuyaDevice, Boolean) -> Unit
+    private val onDeviceToggle: (TuyaDevice, Boolean) -> Unit,
+    private val onDeviceClick: (TuyaDevice) -> Unit
 ) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
 
     class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -41,6 +42,10 @@ class DeviceAdapter(
         holder.deviceSwitch.setOnCheckedChangeListener { _, isChecked ->
             device.isOn = isChecked
             onDeviceToggle(device, isChecked)
+        }
+        
+        holder.cardView.setOnClickListener {
+            onDeviceClick(device)
         }
         
         holder.cardView.alpha = if (device.isOnline) 1.0f else 0.6f
