@@ -137,25 +137,55 @@ class TuyaServer(
         lanIp: String
     ): Boolean {
         try {
-            Log.d("TuyaServer", "[$siteName] Enviando '$action' → $tuyaDeviceId")
+            Log.d("TuyaServer", "[$siteName] Enviando '$action' → $tuyaDeviceId @ $lanIp")
             
-            // TODO: Implementar controle real do dispositivo Tuya usando biblioteca Tuya
-            // Por enquanto, vamos simular ou usar uma biblioteca Tuya para Android
-            // Exemplo: usar Tuya SDK ou implementar protocolo Tuya local
+            // Se lanIp for "auto", tentar descobrir o IP
+            var deviceIp = lanIp
+            if (lanIp == "auto" || lanIp.isEmpty()) {
+                Log.d("TuyaServer", "Descobrindo IP do dispositivo $tuyaDeviceId...")
+                // Por enquanto, tentar descobrir (implementação simplificada)
+                // Em produção, usar cache ou descoberta mais robusta
+                deviceIp = discoverDeviceIp(tuyaDeviceId)
+                if (deviceIp == null) {
+                    Log.e("TuyaServer", "Não foi possível descobrir IP do dispositivo")
+                    return false
+                }
+            }
             
-            // Simulação temporária - substituir pela implementação real
-            Thread.sleep(200) // Simula latência de rede
+            // Enviar comando usando protocolo Tuya
+            val success = com.mritsoftware.mritserver.tuya.TuyaProtocol.sendCommand(
+                deviceId = tuyaDeviceId,
+                localKey = localKey,
+                ip = deviceIp,
+                command = action,
+                version = 3.3
+            )
             
-            // Aqui você precisaria integrar com uma biblioteca Tuya para Android
-            // Por exemplo: TuyaHomeSdk ou implementar o protocolo Tuya localmente
+            if (!success && action == "on") {
+                // Tentar com versão 3.4 se 3.3 falhar
+                Log.d("TuyaServer", "Tentando com versão 3.4...")
+                return com.mritsoftware.mritserver.tuya.TuyaProtocol.sendCommand(
+                    deviceId = tuyaDeviceId,
+                    localKey = localKey,
+                    ip = deviceIp,
+                    command = action,
+                    version = 3.4
+                )
+            }
             
             Log.d("TuyaServer", "Comando enviado com sucesso")
-            return true
+            return success
             
         } catch (e: Exception) {
             Log.e("TuyaServer", "Erro ao enviar comando Tuya", e)
             return false
         }
+    }
+    
+    private fun discoverDeviceIp(deviceId: String): String? {
+        // Implementação simplificada - em produção usar cache ou descoberta mais robusta
+        // Por enquanto retorna null - precisa implementar descoberta real
+        return null
     }
     
     fun setSiteName(name: String) {

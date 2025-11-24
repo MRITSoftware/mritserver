@@ -13,6 +13,7 @@ import com.mritsoftware.mritserver.adapter.DeviceAdapter
 import com.mritsoftware.mritserver.model.TuyaDevice
 import com.mritsoftware.mritserver.service.ServerService
 import com.mritsoftware.mritserver.ui.SettingsActivity
+import com.mritsoftware.mritserver.ui.DeviceDiscoveryActivity
 import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,8 +72,13 @@ class MainActivity : AppCompatActivity() {
     
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.menu_discover -> {
+                val intent = Intent(this, DeviceDiscoveryActivity::class.java)
+                startActivity(intent)
+                true
+            }
             R.id.menu_settings -> {
-                val intent = android.content.Intent(this, SettingsActivity::class.java)
+                val intent = Intent(this, SettingsActivity::class.java)
                 startActivity(intent)
                 true
             }
