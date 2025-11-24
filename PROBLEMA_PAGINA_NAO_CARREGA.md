@@ -104,3 +104,4 @@ Se o Netty não funcionar, podemos trocar para CIOServer (outro engine do Ktor q
 adb logcat -d | grep -i "TuyaServerService\|Netty\|Ktor\|Exception" > logs_servidor.txt
 ```
 
+

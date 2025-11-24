@@ -52,3 +52,4 @@ echo "✅ Ambiente configurado!"
 echo "📝 ANDROID_HOME=${ANDROID_HOME}"
 echo "📝 Para usar: source ~/.bashrc"
 
+

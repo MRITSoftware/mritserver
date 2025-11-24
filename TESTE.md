@@ -196,3 +196,4 @@ Deve mostrar o JSON com status e site.
 
 **Dica:** Use o app **Fing** ou **Network Scanner** no Android para descobrir o IP do dispositivo facilmente!
 
+

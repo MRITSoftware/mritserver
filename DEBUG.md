@@ -218,3 +218,4 @@ chmod +x test_server.sh
 adb logcat -d > logs.txt
 ```
 
+

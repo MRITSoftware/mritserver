@@ -344,23 +344,9 @@ class TuyaServerService : Service() {
                             return response
                         }
                         
-                        val protocolVersion = request.protocol_version ?: 3.4 // Padrão 3.4
-                        
-                        if (protocolVersion != 3.3 && protocolVersion != 3.4) {
-                            val errorResponse = TuyaCommandResponse(
-                                ok = false,
-                                error = "protocol_version deve ser 3.3 ou 3.4"
-                            )
-                            val jsonError = json.encodeToString(serializer<TuyaCommandResponse>(), errorResponse)
-                            Log.d(TAG, "[HTTP] POST /tuya/command respondido com erro: Versão de protocolo inválida")
-                            val response = newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", jsonError)
-                            response.addHeader("Content-Type", "application/json; charset=utf-8")
-                            return response
-                        }
-                        
-                        Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo $protocolVersion")
+                        Log.d(TAG, "[HTTP] Enviando comando Tuya com protocolo 3.4")
                         val lanIp = request.lan_ip ?: ""
-                        LogCollector.addLog(TAG, "[HTTP] Enviando comando Tuya: action=$action, IP=$lanIp, protocol=$protocolVersion", "I")
+                        LogCollector.addLog(TAG, "[HTTP] Enviando comando Tuya: action=$action, IP=$lanIp, protocol=3.4", "I")
                         
                         // sendCommand é suspend, então precisa ser chamado dentro de runBlocking
                         val result = runBlocking {
@@ -368,8 +354,7 @@ class TuyaServerService : Service() {
                                 action = action,
                                 deviceId = request.tuya_device_id ?: "",
                                 localKey = request.local_key ?: "",
-                                lanIp = request.lan_ip ?: "",
-                                protocolVersion = protocolVersion
+                                lanIp = request.lan_ip ?: ""
                             )
                         }
                         
@@ -427,8 +412,7 @@ class TuyaServerService : Service() {
         val action: String? = null,
         val tuya_device_id: String? = null,
         val local_key: String? = null,
-        val lan_ip: String? = null,
-        val protocol_version: Double? = null
+        val lan_ip: String? = null
     )
     
     @Serializable
