@@ -147,7 +147,7 @@ def send_tuya_command(
     log(f"[INFO] [{SITE_NAME}] Enviando '{action}' → {tuya_device_id} @ {lan_ip}")
     
     d = tinytuya.OutletDevice(tuya_device_id, lan_ip, local_key)
-    d.set_version(3.3)  # se der erro de decrypt, testar 3.4
+    d.set_version(3.4)
     
     if action == "on":
         resp = d.turn_on()
