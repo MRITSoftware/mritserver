@@ -1,9 +1,11 @@
 package com.mritsoftware.mritserver.model
 
 data class TuyaDevice(
-    val id: String,
+    val id: String, // tuya_device_id (gwId)
     val name: String,
     val type: DeviceType,
+    var localKey: String? = null, // local_key necessária para comandos
+    var lanIp: String? = null, // IP local (opcional, pode ser "auto")
     var isOnline: Boolean = false,
     var isOn: Boolean = false,
     var brightness: Int = 100,

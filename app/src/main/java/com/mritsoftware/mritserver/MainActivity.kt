@@ -222,9 +222,9 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun getLocalKeyForDevice(deviceId: String): String? {
-        // TODO: Buscar do SharedPreferences ou banco de dados
-        // Por enquanto retorna null para forçar configuração
-        return getSharedPreferences("TuyaGateway", MODE_PRIVATE)
+        // Buscar do dispositivo ou do SharedPreferences
+        val device = devices.find { it.id == deviceId }
+        return device?.localKey ?: getSharedPreferences("TuyaGateway", MODE_PRIVATE)
             .getString("device_${deviceId}_local_key", null)
     }
     
