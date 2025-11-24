@@ -134,9 +134,6 @@ class MainActivity : AppCompatActivity() {
     private fun setupRecyclerView() {
         deviceAdapter = DeviceAdapter(
             devices,
-            onDeviceToggle = { device, isOn ->
-                onDeviceToggle(device, isOn)
-            },
             onDeviceClick = { device ->
                 showDeviceDetails(device)
             }
@@ -230,57 +227,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Erro ao escanear: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 updateUI()
-            }
-        }
-    }
-    
-    private fun onDeviceToggle(device: TuyaDevice, isOn: Boolean) {
-        coroutineScope.launch {
-            try {
-                val localKey = getLocalKeyForDevice(device.id)
-                
-                if (localKey == null) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Configure a local_key do dispositivo ${device.name}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    device.isOn = !isOn
-                    deviceAdapter.notifyDataSetChanged()
-                    return@launch
-                }
-                
-                // Enviar comando via HTTP para o servidor local
-                val action = if (isOn) "on" else "off"
-                val success = withContext(Dispatchers.IO) {
-                    sendCommandToLocalServer(
-                        deviceId = device.id,
-                        localKey = localKey,
-                        action = action,
-                        lanIp = device.lanIp ?: "auto"
-                    )
-                }
-                
-                if (success) {
-                    device.isOn = isOn
-                    val message = if (isOn) {
-                        "${device.name} ligado"
-                    } else {
-                        "${device.name} desligado"
-                    }
-                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
-                    deviceAdapter.notifyDataSetChanged()
-                } else {
-                    // Reverter se falhar
-                    device.isOn = !isOn
-                    deviceAdapter.notifyDataSetChanged()
-                    Toast.makeText(this@MainActivity, "Erro ao controlar dispositivo", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                // Reverter se houver erro
-                device.isOn = !isOn
-                deviceAdapter.notifyDataSetChanged()
-                Toast.makeText(this@MainActivity, "Erro: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
