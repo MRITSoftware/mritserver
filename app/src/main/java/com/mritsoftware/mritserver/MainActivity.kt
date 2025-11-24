@@ -44,8 +44,13 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startServerService() {
+        // Iniciar serviço em foreground para rodar em background
         val intent = Intent(this, PythonServerService::class.java)
-        startService(intent)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
         
         // Atualizar status após um pequeno delay para o servidor iniciar
         coroutineScope.launch {

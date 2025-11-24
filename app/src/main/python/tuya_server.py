@@ -25,20 +25,8 @@ CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 def create_config_if_needed():
     """Cria o config.json com nome do site/tablet."""
     if not os.path.exists(CONFIG_PATH):
-        # No Android, tentar buscar do SharedPreferences via Java
+        # Nome padrão - será atualizado pelo Kotlin via update_site_name()
         site = "ANDROID_DEVICE"
-        
-        try:
-            from jnius import autoclass
-            PythonActivity = autoclass("org.kivy.android.PythonActivity")
-            Context = autoclass("android.content.Context")
-            
-            activity = PythonActivity.mActivity
-            if activity:
-                prefs = activity.getSharedPreferences("TuyaGateway", Context.MODE_PRIVATE)
-                site = prefs.getString("site_name", "ANDROID_DEVICE") or "ANDROID_DEVICE"
-        except Exception as e:
-            print(f"[WARN] Não foi possível ler SharedPreferences: {e}")
         
         cfg = {
             "site_name": site
