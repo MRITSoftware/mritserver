@@ -52,9 +52,19 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
           
+    - name: Create Keystore
+      run: |
+        echo "Criando keystore para assinatura do APK..."
+        keytool -genkeypair -v -storetype PKCS12 -keystore app/release.keystore -alias mritserver -keyalg RSA -keysize 2048 -validity 10000 -storepass mritserver123 -keypass mritserver123 -dname "CN=MRIT Software, OU=Development, O=MRIT Software, L=City, S=State, C=BR"
+        echo "Keystore criada com sucesso!"
+        
     - name: Build APK
       run: |
-        ./gradlew assembleRelease --no-daemon --stacktrace
+        ./gradlew assembleRelease --no-daemon --stacktrace \
+          -PMYAPP_RELEASE_STORE_FILE=app/release.keystore \
+          -PMYAPP_RELEASE_STORE_PASSWORD=mritserver123 \
+          -PMYAPP_RELEASE_KEY_ALIAS=mritserver \
+          -PMYAPP_RELEASE_KEY_PASSWORD=mritserver123
         
     - name: List build outputs
       run: |
@@ -74,9 +84,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: app-release
-        path: |
-          app/build/outputs/apk/release/*.apk
-          app/build/outputs/apk/debug/*.apk
+        path: app/build/outputs/apk/release/app-release.apk
         retention-days: 30
         if-no-files-found: warn
 
