@@ -6,6 +6,24 @@ Aplicativo Android para Gateway Tuya.
 
 Este projeto é um aplicativo Android desenvolvido para funcionar como servidor/gateway para dispositivos Tuya.
 
+### ✨ Funcionalidades
+
+- ✅ Interface moderna com Material Design 3
+- ✅ Lista de dispositivos Tuya conectados
+- ✅ Controle de dispositivos (ligar/desligar)
+- ✅ Status em tempo real (online/offline)
+- ✅ Atualização manual de dispositivos
+- ✅ Visualização de informações dos dispositivos
+- ✅ APK assinado automaticamente no GitHub Actions
+
+### 📝 Nota sobre Integração
+
+O aplicativo atualmente utiliza dados de exemplo (mock) para demonstração. Para integração completa com a API Tuya, será necessário:
+
+1. Adicionar SDK da Tuya ou implementar chamadas HTTP para a API
+2. Configurar credenciais de autenticação
+3. Substituir as funções mock em `MainActivity.kt` pelas chamadas reais
+
 ## 🚀 Como Gerar o APK
 
 ### ⚠️ Importante: Arquivo gradle-wrapper.jar
