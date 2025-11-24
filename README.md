@@ -37,6 +37,7 @@ O projeto está configurado com GitHub Actions para gerar o APK automaticamente.
    - Na seção **Artifacts**, baixe o arquivo `app-release`
 
 3. **O APK estará disponível para download por 30 dias**
+4. **O APK será assinado automaticamente** com uma keystore gerada durante o build
 
 ### Opção 2: Build Local (Requer Android SDK)
 
