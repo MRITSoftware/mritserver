@@ -68,10 +68,23 @@ class TuyaClient(private val context: Context? = null) {
             
             // Criptografa payload
             val payload = jsonCommand.toByteArray(Charsets.UTF_8)
+            Log.d(TAG, "[DEBUG] Payload antes de criptografar (${payload.size} bytes): ${payload.joinToString(" ") { "%02X".format(it) }}")
+            
             val encrypted = encrypt(payload, localKey)
+            Log.d(TAG, "[DEBUG] Payload criptografado (${encrypted.size} bytes): ${encrypted.take(32).joinToString(" ") { "%02X".format(it) }}...")
             
             // Cria pacote Tuya 3.4
             val packet = buildPacket(encrypted, timestamp)
+            
+            // Log detalhado do pacote
+            Log.d(TAG, "[DEBUG] Pacote completo (${packet.size} bytes):")
+            Log.d(TAG, "[DEBUG] Primeiros 32 bytes: ${packet.take(32).joinToString(" ") { "%02X".format(it) }}")
+            Log.d(TAG, "[DEBUG] Prefix (bytes 0-3): ${packet.take(4).joinToString(" ") { "%02X".format(it) }}")
+            Log.d(TAG, "[DEBUG] Version (bytes 4-7): ${packet.slice(4..7).joinToString(" ") { "%02X".format(it) }}")
+            Log.d(TAG, "[DEBUG] Command (bytes 8-11): ${packet.slice(8..11).joinToString(" ") { "%02X".format(it) }}")
+            Log.d(TAG, "[DEBUG] Length (bytes 12-15): ${packet.slice(12..15).joinToString(" ") { "%02X".format(it) }} (valor: ${encrypted.size})")
+            Log.d(TAG, "[DEBUG] Sequence (bytes 16-19): ${packet.slice(16..19).joinToString(" ") { "%02X".format(it) }} (timestamp: $timestamp)")
+            Log.d(TAG, "[DEBUG] Suffix (últimos 4 bytes): ${packet.takeLast(4).joinToString(" ") { "%02X".format(it) }}")
             
             // Envia via UDP
             val response = sendUdpPacket(lanIp, PORT, packet)
@@ -92,7 +105,11 @@ class TuyaClient(private val context: Context? = null) {
     
     /**
      * Constrói pacote Tuya protocolo 3.4
-     * Formato: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) + payload + suffix(4)
+     * Formato baseado no tinytuya Python
+     * Header: prefix(4) + version(4) + command(4) + length(4) + sequence(4) + return_code(4) = 24 bytes
+     * + payload criptografado + suffix(4)
+     * 
+     * IMPORTANTE: Tuya usa BIG-ENDIAN para inteiros no header (não little-endian!)
      */
     private fun buildPacket(encryptedPayload: ByteArray, sequence: Int): ByteArray {
         val headerSize = 24
@@ -102,55 +119,64 @@ class TuyaClient(private val context: Context? = null) {
         val packet = ByteArray(totalSize)
         var offset = 0
         
-        // Prefix: 0x000055AA (little-endian: AA 55 00 00)
-        packet[offset++] = 0xAA.toByte()
-        packet[offset++] = 0x55.toByte()
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
+        // Prefix: 0x000055AA (BIG-ENDIAN: 00 00 55 AA)
+        val prefixBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(0x000055AA)
+        }.array()
+        System.arraycopy(prefixBytes, 0, packet, offset, 4)
+        offset += 4
         
         // Version: 0x00000000 (protocolo 3.4 ainda usa 0 no header)
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
+        val versionBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(0x00000000)
+        }.array()
+        System.arraycopy(versionBytes, 0, packet, offset, 4)
+        offset += 4
         
         // Command: 0x0000000D (CONTROL)
-        packet[offset++] = 0x0D.toByte()
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
+        val commandBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(0x0000000D)
+        }.array()
+        System.arraycopy(commandBytes, 0, packet, offset, 4)
+        offset += 4
         
-        // Length: tamanho do payload (little-endian)
+        // Length: tamanho do payload (BIG-ENDIAN)
         val lengthBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.LITTLE_ENDIAN)
+            order(ByteOrder.BIG_ENDIAN)
             putInt(encryptedPayload.size)
         }.array()
         System.arraycopy(lengthBytes, 0, packet, offset, 4)
         offset += 4
         
-        // Sequence: timestamp (little-endian)
+        // Sequence: timestamp (BIG-ENDIAN)
         val sequenceBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.LITTLE_ENDIAN)
+            order(ByteOrder.BIG_ENDIAN)
             putInt(sequence)
         }.array()
         System.arraycopy(sequenceBytes, 0, packet, offset, 4)
         offset += 4
         
         // Return code: 0x00000000
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
+        val returnCodeBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(0x00000000)
+        }.array()
+        System.arraycopy(returnCodeBytes, 0, packet, offset, 4)
+        offset += 4
         
         // Payload criptografado
         System.arraycopy(encryptedPayload, 0, packet, offset, encryptedPayload.size)
         offset += encryptedPayload.size
         
-        // Suffix: 0x0000AA55 (little-endian: 55 AA 00 00)
-        packet[offset++] = 0x55.toByte()
-        packet[offset++] = 0xAA.toByte()
-        packet[offset++] = 0x00
-        packet[offset++] = 0x00
+        // Suffix: 0x0000AA55 (BIG-ENDIAN: 00 00 AA 55)
+        val suffixBytes = ByteBuffer.allocate(4).apply {
+            order(ByteOrder.BIG_ENDIAN)
+            putInt(0x0000AA55)
+        }.array()
+        System.arraycopy(suffixBytes, 0, packet, offset, 4)
         
         return packet
     }
