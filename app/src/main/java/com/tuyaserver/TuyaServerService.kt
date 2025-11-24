@@ -329,7 +329,7 @@ class TuyaServerService : Service() {
                             Log.d(TAG, "[HTTP] POST /tuya/command recebido (${bodyString.length} bytes): $bodyString")
                         
                         val request = json.decodeFromString<TuyaCommandRequest>(bodyString)
-                        Log.d(TAG, "[HTTP] Request parseado: action=${request.action}, protocol=${request.protocol_version}")
+                        Log.d(TAG, "[HTTP] Request parseado: action=${request.action}")
                         
                         val action = request.action
                         if (action == null || action !in listOf("on", "off")) {
