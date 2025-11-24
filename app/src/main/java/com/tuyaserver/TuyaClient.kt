@@ -587,25 +587,12 @@ class TuyaClient(private val context: Context? = null) {
             
             log("[DISCOVERY] Enviando pacote de descoberta (broadcast)...")
             
-            // Tenta enviar para broadcast e também para IPs de rede local
+            // Tenta enviar para broadcast global
             try {
-                // Envia para broadcast global
                 val broadcastAddress = InetAddress.getByName("255.255.255.255")
                 val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, broadcastAddress, DISCOVERY_PORT)
                 socket.send(packet)
                 log("[DISCOVERY] ✅ Pacote broadcast enviado para 255.255.255.255:$DISCOVERY_PORT")
-                
-                // Também tenta enviar para o endereço de broadcast da rede local
-                try {
-                    val localBroadcast = getLocalBroadcastAddress()
-                    if (localBroadcast != null) {
-                        val localPacket = DatagramPacket(discoveryPacket, discoveryPacket.size, localBroadcast, DISCOVERY_PORT)
-                        socket.send(localPacket)
-                        log("[DISCOVERY] ✅ Pacote broadcast enviado para ${localBroadcast.hostAddress}:$DISCOVERY_PORT")
-                    }
-                } catch (e: Exception) {
-                    log("[DISCOVERY] ⚠️ Erro ao enviar para broadcast local: ${e.message}")
-                }
             } catch (e: Exception) {
                 log("[DISCOVERY] ⚠️ Erro ao enviar broadcast: ${e.message}")
             }
