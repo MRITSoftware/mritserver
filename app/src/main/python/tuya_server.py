@@ -95,6 +95,41 @@ def scan_and_print_devices() -> None:
         log(f"[SCAN] Erro ao escanear dispositivos Tuya: {e}")
         traceback.print_exc()
 
+def scan_devices() -> Dict[str, Any]:
+    """Faz um scan na rede e retorna todos os dispositivos Tuya encontrados em formato dict."""
+    log("[SCAN] Iniciando scan de dispositivos Tuya na rede...")
+    discovered_devices = {}
+    
+    try:
+        devices = tinytuya.deviceScan()
+        
+        if not isinstance(devices, dict):
+            log(f"[SCAN] Resultado inesperado de deviceScan(): {type(devices)}")
+            return {}
+        
+        if not devices:
+            log("[SCAN] Nenhum dispositivo Tuya encontrado.")
+            return {}
+        
+        log(f"[SCAN] {len(devices)} dispositivo(s) encontrado(s):")
+        for ip, dev in devices.items():
+            gwid = dev.get("gwId")
+            ver = dev.get("version") or dev.get("ver")
+            log(f"[SCAN] gwId={gwid}  ip={ip}  ver={ver}")
+            
+            if gwid:
+                discovered_devices[gwid] = {
+                    "id": gwid,
+                    "ip": ip,
+                    "version": ver
+                }
+    
+    except Exception as e:
+        log(f"[SCAN] Erro ao escanear dispositivos Tuya: {e}")
+        traceback.print_exc()
+    
+    return discovered_devices
+
 def discover_tuya_ip(tuya_device_id: str) -> Optional[str]:
     """
     Tenta descobrir o IP LAN de um dispositivo Tuya pelo gwId (device_id),
@@ -166,33 +201,17 @@ def send_tuya_command(
     
     d = tinytuya.OutletDevice(tuya_device_id, lan_ip, local_key)
     
-    # Tentar versão 3.3 primeiro, depois 3.4 se falhar
-    success = False
-    last_error = None
+    # Usar apenas protocolo 3.4
+    d.set_version(3.4)
     
-    for version in [3.3, 3.4]:
-        try:
-            d.set_version(version)
-            log(f"[DEBUG] Tentando protocolo versão {version}")
-            
-            if action == "on":
-                resp = d.turn_on()
-            elif action == "off":
-                resp = d.turn_off()
-            else:
-                raise ValueError(f"Ação inválida: {action}")
-            
-            log(f"[DEBUG] Resposta do dispositivo (v{version}): {resp}")
-            success = True
-            break
-            
-        except Exception as e:
-            last_error = e
-            log(f"[DEBUG] Erro com versão {version}: {e}")
-            continue
+    if action == "on":
+        resp = d.turn_on()
+    elif action == "off":
+        resp = d.turn_off()
+    else:
+        raise ValueError(f"Ação inválida: {action}")
     
-    if not success:
-        raise RuntimeError(f"Falha ao enviar comando após tentar versões 3.3 e 3.4: {last_error}")
+    log(f"[DEBUG] Resposta do dispositivo: {resp}")
 
 # =========================
 # API HTTP
@@ -229,6 +248,25 @@ def api_tuya_command():
     except Exception as e:
         err = str(e)
         log(f"[ERRO] API /tuya/command: {err}")
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": err}), 500
+
+@app.route("/tuya/devices", methods=["GET"])
+def api_tuya_devices():
+    """Retorna lista de dispositivos escaneados na rede"""
+    try:
+        devices = scan_devices()
+        device_list = []
+        for gwid, dev_info in devices.items():
+            device_list.append({
+                "id": gwid,
+                "ip": dev_info.get("ip", ""),
+                "version": dev_info.get("version", "")
+            })
+        return jsonify({"ok": True, "devices": device_list}), 200
+    except Exception as e:
+        err = str(e)
+        log(f"[ERRO] API /tuya/devices: {err}")
         traceback.print_exc()
         return jsonify({"ok": False, "error": err}), 500
 

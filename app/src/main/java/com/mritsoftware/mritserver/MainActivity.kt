@@ -1,6 +1,7 @@
 package com.mritsoftware.mritserver
 
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.TextView
@@ -39,9 +40,13 @@ class MainActivity : AppCompatActivity() {
         setupToolbar()
         setupViews()
         setupRecyclerView()
-        setupListeners()
-        startServerService()
-        loadSampleDevices()
+                setupListeners()
+                startServerService()
+                // Aguardar servidor iniciar antes de carregar dispositivos
+                coroutineScope.launch {
+                    kotlinx.coroutines.delay(3000) // Dar tempo para o servidor Python iniciar
+                    refreshDevices()
+                }
     }
     
     private fun startServerService() {
@@ -152,52 +157,78 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun loadSampleDevices() {
-        // Dispositivos de exemplo - substitua pela integração real com Tuya
-        devices.clear()
-        devices.addAll(listOf(
-            TuyaDevice(
-                id = "1",
-                name = "Lâmpada Sala",
-                type = TuyaDevice.DeviceType.LIGHT,
-                isOnline = true,
-                isOn = false,
-                brightness = 80
-            ),
-            TuyaDevice(
-                id = "2",
-                name = "Interruptor Quarto",
-                type = TuyaDevice.DeviceType.SWITCH,
-                isOnline = true,
-                isOn = true
-            ),
-            TuyaDevice(
-                id = "3",
-                name = "Sensor Temperatura",
-                type = TuyaDevice.DeviceType.SENSOR,
-                isOnline = true,
-                temperature = 22
-            ),
-            TuyaDevice(
-                id = "4",
-                name = "Lâmpada Cozinha",
-                type = TuyaDevice.DeviceType.LIGHT,
-                isOnline = false,
-                isOn = false
-            )
-        ))
-        updateUI()
-    }
-    
     private fun refreshDevices() {
-        Toast.makeText(this, "Atualizando dispositivos...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Escaneando dispositivos...", Toast.LENGTH_SHORT).show()
         coroutineScope.launch {
-            // Por enquanto apenas atualiza status online/offline
-            devices.forEach { device ->
-                device.isOnline = kotlin.random.Random.nextBoolean()
+            try {
+                // Inicializar Python se necessário
+                if (!com.chaquo.python.Python.isStarted()) {
+                    com.chaquo.python.Python.start(com.chaquo.python.android.AndroidPlatform(this@MainActivity))
+                }
+                
+                val python = com.chaquo.python.Python.getInstance()
+                val module = python.getModule("tuya_server")
+                
+                // Chamar scan_devices do Python
+                val scanResult = withContext(Dispatchers.IO) {
+                    try {
+                        val result = module.callAttr("scan_devices")
+                        if (result != null) {
+                            val resultDict = result.asDict()
+                            val devicesMap = mutableMapOf<String, Map<String, Any>>()
+                            
+                            for (key in resultDict.keys()) {
+                                val deviceInfo = resultDict[key]?.asDict()
+                                if (deviceInfo != null) {
+                                    val deviceMap = mutableMapOf<String, Any>()
+                                    for (infoKey in deviceInfo.keys()) {
+                                        deviceMap[infoKey.toString()] = deviceInfo[infoKey]?.toString() ?: ""
+                                    }
+                                    devicesMap[key.toString()] = deviceMap
+                                }
+                            }
+                            devicesMap
+                        } else {
+                            null
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Erro ao escanear dispositivos", e)
+                        null
+                    }
+                }
+                
+                devices.clear()
+                
+                if (scanResult != null && scanResult.isNotEmpty()) {
+                    val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
+                    
+                    for ((deviceId, deviceInfo) in scanResult) {
+                        val ip = deviceInfo["ip"]?.toString() ?: ""
+                        val savedName = prefs.getString("device_${deviceId}_name", null)
+                        val name = savedName ?: "Dispositivo ${deviceId.take(8)}"
+                        
+                        devices.add(
+                            TuyaDevice(
+                                id = deviceId,
+                                name = name,
+                                type = TuyaDevice.DeviceType.OTHER,
+                                isOnline = true,
+                                isOn = false,
+                                lanIp = ip
+                            )
+                        )
+                    }
+                    
+                    Toast.makeText(this@MainActivity, "${devices.size} dispositivo(s) encontrado(s)", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Nenhum dispositivo encontrado", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Erro ao buscar dispositivos", e)
+                Toast.makeText(this@MainActivity, "Erro ao escanear: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                updateUI()
             }
-            updateUI()
-            Toast.makeText(this@MainActivity, "Dispositivos atualizados!", Toast.LENGTH_SHORT).show()
         }
     }
     
