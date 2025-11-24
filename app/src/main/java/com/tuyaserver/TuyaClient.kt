@@ -275,17 +275,17 @@ class TuyaClient(private val context: Context? = null) {
         packet[offset++] = 0x00
         packet[offset++] = 0x0D.toByte()
         
-        // Length: 4 bytes em big-endian
+        // Length: 4 bytes - TENTA LITTLE-ENDIAN (protocolo Tuya pode usar little-endian para length)
         val lengthBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
+            order(ByteOrder.LITTLE_ENDIAN)
             putInt(encrypted.size)
         }.array()
         System.arraycopy(lengthBytes, 0, packet, offset, 4)
         offset += 4
         
-        // Sequence: 4 bytes em big-endian
+        // Sequence: 4 bytes - TENTA LITTLE-ENDIAN (protocolo Tuya pode usar little-endian para sequence)
         val sequenceBytes = ByteBuffer.allocate(4).apply {
-            order(ByteOrder.BIG_ENDIAN)
+            order(ByteOrder.LITTLE_ENDIAN)
             putInt(sequence)
         }.array()
         System.arraycopy(sequenceBytes, 0, packet, offset, 4)
@@ -311,13 +311,13 @@ class TuyaClient(private val context: Context? = null) {
         
         log("[DEBUG] Pacote completo: ${packetArray.size} bytes")
         log("[DEBUG] Header completo (24 bytes): ${packetArray.take(24).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 55 AA = 0x000055AA)")
+        log("[DEBUG] Prefix: ${packetArray.take(4).joinToString(" ") { "%02X".format(it) }} (deve ser: 55 AA 00 00)")
         log("[DEBUG] Version: ${packetArray.slice(4..7).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 00 0D = 0x0000000D)")
-        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes, big-endian)")
-        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }} (big-endian)")
+        log("[DEBUG] Command: ${packetArray.slice(8..11).joinToString(" ") { "%02X".format(it) }} (deve ser: 00 00 00 0D)")
+        log("[DEBUG] Length: ${packetArray.slice(12..15).joinToString(" ") { "%02X".format(it) }} (${encrypted.size} bytes, LITTLE-ENDIAN)")
+        log("[DEBUG] Sequence: ${packetArray.slice(16..19).joinToString(" ") { "%02X".format(it) }} (LITTLE-ENDIAN)")
         log("[DEBUG] Return code: ${packetArray.slice(20..23).joinToString(" ") { "%02X".format(it) }}")
-        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (big-endian: 00 00 AA 55 = 0x0000AA55)")
+        log("[DEBUG] Suffix: ${packetArray.takeLast(4).joinToString(" ") { "%02X".format(it) }} (deve ser: AA 55 00 00)")
         
         return packetArray
     }
@@ -589,10 +589,23 @@ class TuyaClient(private val context: Context? = null) {
             
             // Tenta enviar para broadcast e também para IPs de rede local
             try {
+                // Envia para broadcast global
                 val broadcastAddress = InetAddress.getByName("255.255.255.255")
                 val packet = DatagramPacket(discoveryPacket, discoveryPacket.size, broadcastAddress, DISCOVERY_PORT)
                 socket.send(packet)
                 log("[DISCOVERY] ✅ Pacote broadcast enviado para 255.255.255.255:$DISCOVERY_PORT")
+                
+                // Também tenta enviar para o endereço de broadcast da rede local
+                try {
+                    val localBroadcast = getLocalBroadcastAddress()
+                    if (localBroadcast != null) {
+                        val localPacket = DatagramPacket(discoveryPacket, discoveryPacket.size, localBroadcast, DISCOVERY_PORT)
+                        socket.send(localPacket)
+                        log("[DISCOVERY] ✅ Pacote broadcast enviado para ${localBroadcast.hostAddress}:$DISCOVERY_PORT")
+                    }
+                } catch (e: Exception) {
+                    log("[DISCOVERY] ⚠️ Erro ao enviar para broadcast local: ${e.message}")
+                }
             } catch (e: Exception) {
                 log("[DISCOVERY] ⚠️ Erro ao enviar broadcast: ${e.message}")
             }
