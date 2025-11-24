@@ -140,16 +140,17 @@ class TuyaServer(
             Log.d("TuyaServer", "[$siteName] Enviando '$action' → $tuyaDeviceId @ $lanIp")
             
             // Se lanIp for "auto", tentar descobrir o IP
-            var deviceIp = lanIp
+            var deviceIp: String = lanIp
             if (lanIp == "auto" || lanIp.isEmpty()) {
                 Log.d("TuyaServer", "Descobrindo IP do dispositivo $tuyaDeviceId...")
                 // Por enquanto, tentar descobrir (implementação simplificada)
                 // Em produção, usar cache ou descoberta mais robusta
-                deviceIp = discoverDeviceIp(tuyaDeviceId)
-                if (deviceIp == null) {
+                val discoveredIp = discoverDeviceIp(tuyaDeviceId)
+                if (discoveredIp == null) {
                     Log.e("TuyaServer", "Não foi possível descobrir IP do dispositivo")
                     return false
                 }
+                deviceIp = discoveredIp
             }
             
             // Enviar comando usando protocolo Tuya

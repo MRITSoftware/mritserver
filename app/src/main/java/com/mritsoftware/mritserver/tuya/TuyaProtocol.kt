@@ -129,7 +129,7 @@ object TuyaProtocol {
     private fun calculateCRC(data: ByteArray, offset: Int, length: Int): Int {
         var crc = 0
         for (i in offset until (offset + length)) {
-            crc = (crc + (data[i].toInt() and 0xFF)) and 0xFFFFFFFF
+            crc = (crc + (data[i].toInt() and 0xFF)) and 0xFFFFFFFF.toInt()
         }
         return crc
     }
