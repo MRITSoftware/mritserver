@@ -297,9 +297,6 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNeutralButton("🔍 Descobrir") { _, _ ->
-                discoverTuyaDevices(deviceIdInput, lanIpInput)
-            }
             .setNegativeButton("Cancelar", null)
             .create()
         
