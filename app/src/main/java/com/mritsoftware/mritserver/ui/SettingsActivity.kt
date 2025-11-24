@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 
 class SettingsActivity : AppCompatActivity() {
     
-    private lateinit var serverUrlInput: TextInputEditText
     private lateinit var siteNameInput: TextInputEditText
     private lateinit var testButton: MaterialButton
     private lateinit var saveButton: MaterialButton
@@ -20,8 +19,6 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
-        
-        flaskService = FlaskService(this)
         
         setupToolbar()
         setupViews()
@@ -39,13 +36,11 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun setupViews() {
-        serverUrlInput = findViewById(R.id.serverUrlInput)
         siteNameInput = findViewById(R.id.siteNameInput)
         testButton = findViewById(R.id.testButton)
         saveButton = findViewById(R.id.saveButton)
         
         val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
-        serverUrlInput.setText("http://0.0.0.0:8000")
         siteNameInput.setText(prefs.getString("site_name", "ANDROID_DEVICE") ?: "ANDROID_DEVICE")
     }
     

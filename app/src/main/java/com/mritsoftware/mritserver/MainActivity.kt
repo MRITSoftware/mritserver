@@ -29,7 +29,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var refreshButton: MaterialButton
     
     private val devices = mutableListOf<TuyaDevice>()
-    private lateinit var serverService: ServerService
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -4,8 +4,6 @@ import os
 import json
 import traceback
 from typing import Optional, Dict, Any
-from android import mActivity
-from android.storage import app_storage_path
 
 from flask import Flask, request, jsonify
 import tinytuya
@@ -14,7 +12,14 @@ import tinytuya
 # CONFIG & AUTO-SETUP
 # =========================
 
-BASE_DIR = app_storage_path()
+# No Android, usar o diretório de dados do app
+try:
+    from android.storage import app_storage_path
+    BASE_DIR = app_storage_path()
+except ImportError:
+    # Fallback se não estiver no Android
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 
 def create_config_if_needed():
