@@ -259,8 +259,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
+        val localIp = getLocalIpAddress()
         val lanIpInput = EditText(this).apply {
-            hint = "IP do dispositivo Tuya (ex: 192.168.1.100)"
+            hint = "IP do dispositivo Tuya na rede local (ex: 192.168.0.193)"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -273,14 +274,25 @@ class MainActivity : AppCompatActivity() {
         
         val dialog = AlertDialog.Builder(this)
             .setTitle("Comando Tuya - Ligar")
-            .setMessage("Preencha os dados do dispositivo Tuya:\n\n• Device ID: ID do dispositivo\n• Local Key: Chave local\n• IP: IP do dispositivo na rede")
+            .setMessage("Preencha os dados do dispositivo Tuya:\n\n• Device ID: ID do dispositivo\n• Local Key: Chave local\n• IP: IP do dispositivo Tuya na rede local\n\n⚠️ IMPORTANTE: Use o IP do dispositivo Tuya (ex: 192.168.0.193), NÃO o IP do Android (${if (localIp != "Não disponível") localIp else "seu IP"})")
             .setView(layout)
             .setPositiveButton("Enviar") { _, _ ->
                 val deviceId = deviceIdInput.text.toString().trim()
                 val localKey = localKeyInput.text.toString().trim()
                 val lanIp = lanIpInput.text.toString().trim()
+                val currentLocalIp = getLocalIpAddress()
                 
                 if (deviceId.isNotEmpty() && localKey.isNotEmpty() && lanIp.isNotEmpty()) {
+                    // Valida se o IP não é o IP do Android
+                    if (currentLocalIp != "Não disponível" && lanIp == currentLocalIp) {
+                        AlertDialog.Builder(this)
+                            .setTitle("⚠️ IP Incorreto")
+                            .setMessage("Você está usando o IP do Android ($currentLocalIp)!\n\nUse o IP do dispositivo Tuya na rede local (ex: 192.168.0.193).\n\nUse o botão '🔍 Descobrir' para encontrar o dispositivo automaticamente.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                        return@setPositiveButton
+                    }
+                    
                     // Sempre usa ação "on"
                     sendTuyaCommand("on", deviceId, localKey, lanIp)
                 } else {
