@@ -6,12 +6,6 @@
         android:id="@+id/menu_settings"
         android:title="Configurações"
         android:icon="@android:drawable/ic_menu_preferences"
-        app:showAsAction="never" />
-    
-    <item
-        android:id="@+id/menu_logout"
-        android:title="Sair"
-        android:icon="@android:drawable/ic_menu_close_clear_cancel"
-        app:showAsAction="never" />
+        app:showAsAction="ifRoom" />
 </menu>
 

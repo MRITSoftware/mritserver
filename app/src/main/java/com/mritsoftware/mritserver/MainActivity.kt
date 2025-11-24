@@ -11,8 +11,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.mritsoftware.mritserver.adapter.DeviceAdapter
 import com.mritsoftware.mritserver.model.TuyaDevice
-import com.mritsoftware.mritserver.service.TuyaService
-import com.mritsoftware.mritserver.ui.LoginActivity
+import com.mritsoftware.mritserver.service.FlaskService
+import com.mritsoftware.mritserver.ui.SettingsActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,20 +27,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var refreshButton: MaterialButton
     
     private val devices = mutableListOf<TuyaDevice>()
-    private lateinit var tuyaService: TuyaService
+    private lateinit var flaskService: FlaskService
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
-        tuyaService = TuyaService(this)
+        flaskService = FlaskService(this)
         
         setupToolbar()
         setupViews()
         setupRecyclerView()
         setupListeners()
-        initializeGateway()
+        checkServerConnection()
     }
     
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -50,48 +50,46 @@ class MainActivity : AppCompatActivity() {
     
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.menu_logout -> {
-                logout()
-                true
-            }
             R.id.menu_settings -> {
-                // TODO: Abrir tela de configurações
-                Toast.makeText(this, "Configurações em desenvolvimento", Toast.LENGTH_SHORT).show()
+                val intent = android.content.Intent(this, SettingsActivity::class.java)
+                startActivity(intent)
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
     
-    private fun logout() {
-        getSharedPreferences("TuyaGateway", MODE_PRIVATE).edit()
-            .putBoolean("is_logged_in", false)
-            .clear()
-            .apply()
-        
-        val intent = android.content.Intent(this, LoginActivity::class.java)
-        intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-    
-    private fun initializeGateway() {
+    private fun checkServerConnection() {
         coroutineScope.launch {
             try {
-                val success = withContext(Dispatchers.IO) {
-                    tuyaService.initializeGateway()
+                val isConnected = withContext(Dispatchers.IO) {
+                    flaskService.checkServerHealth()
                 }
                 
-                if (success) {
-                    tuyaService.setGatewayConnected(true)
-                    loadDevices()
+                if (isConnected) {
+                    val siteInfo = withContext(Dispatchers.IO) {
+                        flaskService.getSiteInfo()
+                    }
+                    gatewayStatus.text = "Conectado"
+                    if (siteInfo != null) {
+                        gatewayStatus.text = "Conectado - $siteInfo"
+                    }
+                    gatewayStatus.setTextColor(getColor(R.color.teal_700))
+                    loadSampleDevices() // Por enquanto usa dados de exemplo
                 } else {
-                    Toast.makeText(this@MainActivity, "Erro ao conectar ao Gateway", Toast.LENGTH_LONG).show()
-                    loadSampleDevices() // Fallback para dados de exemplo
+                    gatewayStatus.text = "Desconectado"
+                    gatewayStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Servidor Flask não encontrado. Configure em Configurações.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    loadSampleDevices()
                 }
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
-                loadSampleDevices() // Fallback para dados de exemplo
+                gatewayStatus.text = "Erro de conexão"
+                gatewayStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                loadSampleDevices()
             }
         }
     }
@@ -159,60 +157,44 @@ class MainActivity : AppCompatActivity() {
         updateUI()
     }
     
-    private fun loadDevices() {
-        coroutineScope.launch {
-            try {
-                val discoveredDevices = withContext(Dispatchers.IO) {
-                    tuyaService.syncDevices()
-                }
-                
-                if (discoveredDevices.isNotEmpty()) {
-                    devices.clear()
-                    devices.addAll(discoveredDevices)
-                    updateUI()
-                } else {
-                    // Se não encontrar dispositivos reais, usar exemplos
-                    loadSampleDevices()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Erro ao carregar dispositivos: ${e.message}", Toast.LENGTH_SHORT).show()
-                loadSampleDevices()
-            }
-        }
-    }
-    
     private fun refreshDevices() {
         Toast.makeText(this, "Atualizando dispositivos...", Toast.LENGTH_SHORT).show()
         coroutineScope.launch {
-            try {
-                val discoveredDevices = withContext(Dispatchers.IO) {
-                    tuyaService.syncDevices()
-                }
-                
-                if (discoveredDevices.isNotEmpty()) {
-                    devices.clear()
-                    devices.addAll(discoveredDevices)
-                    updateUI()
-                    Toast.makeText(this@MainActivity, "Dispositivos atualizados!", Toast.LENGTH_SHORT).show()
-                } else {
-                    // Simula atualização se não houver dispositivos reais
-                    devices.forEach { device ->
-                        device.isOnline = kotlin.random.Random.nextBoolean()
-                    }
-                    updateUI()
-                    Toast.makeText(this@MainActivity, "Dispositivos atualizados!", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Erro ao atualizar: ${e.message}", Toast.LENGTH_SHORT).show()
+            // Por enquanto apenas atualiza status online/offline
+            devices.forEach { device ->
+                device.isOnline = kotlin.random.Random.nextBoolean()
             }
+            updateUI()
+            Toast.makeText(this@MainActivity, "Dispositivos atualizados!", Toast.LENGTH_SHORT).show()
         }
     }
     
     private fun onDeviceToggle(device: TuyaDevice, isOn: Boolean) {
         coroutineScope.launch {
             try {
+                // Buscar local_key do dispositivo (por enquanto usa um valor padrão)
+                // TODO: Armazenar local_key de cada dispositivo
+                val localKey = getLocalKeyForDevice(device.id)
+                
+                if (localKey == null) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Configure a local_key do dispositivo ${device.name}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    device.isOn = !isOn
+                    deviceAdapter.notifyDataSetChanged()
+                    return@launch
+                }
+                
+                val action = if (isOn) "on" else "off"
                 val success = withContext(Dispatchers.IO) {
-                    tuyaService.updateDeviceStatus(device.id, isOn)
+                    flaskService.sendCommand(
+                        deviceId = device.id,
+                        localKey = localKey,
+                        action = action,
+                        lanIp = null // "auto" será usado
+                    )
                 }
                 
                 if (success) {
@@ -237,6 +219,13 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Erro: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+    
+    private fun getLocalKeyForDevice(deviceId: String): String? {
+        // TODO: Buscar do SharedPreferences ou banco de dados
+        // Por enquanto retorna null para forçar configuração
+        return getSharedPreferences("TuyaGateway", MODE_PRIVATE)
+            .getString("device_${deviceId}_local_key", null)
     }
     
     private fun updateUI() {

@@ -18,7 +18,7 @@
         android:theme="@style/Theme.MRITServer"
         tools:targetApi="31">
         <activity
-            android:name=".ui.LoginActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize">
@@ -29,10 +29,11 @@
         </activity>
         
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.SettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize" />
+            android:configChanges="orientation|screenSize"
+            android:parentActivityName=".MainActivity" />
     </application>
 
 </manifest>
