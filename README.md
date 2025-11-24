@@ -12,12 +12,7 @@ Este projeto é um aplicativo Android desenvolvido para funcionar como servidor/
 
 O projeto está configurado com GitHub Actions para gerar o APK automaticamente. Siga estes passos:
 
-1. **Faça push do código para o repositório:**
-   ```bash
-   git add .
-   git commit -m "Initial commit"
-   git push -u origin main
-   ```
+1. **O código já foi enviado para o repositório!** ✅
 
 2. **Acesse o GitHub:**
    - Vá para: https://github.com/MRITSoftware/mritserver
