@@ -100,19 +100,30 @@ class DeviceDetailsActivity : AppCompatActivity() {
             
             coroutineScope.launch {
                 try {
+                    // Inicializar Python se necessário
+                    if (!com.chaquo.python.Python.isStarted()) {
+                        com.chaquo.python.Python.start(com.chaquo.python.android.AndroidPlatform(this@DeviceDetailsActivity))
+                    }
+                    
                     // Chamar função Python para descobrir IP
                     val python = com.chaquo.python.Python.getInstance()
                     val module = python.getModule("tuya_server")
                     
                     val discoveredIp = withContext(Dispatchers.IO) {
                         try {
-                            module.callAttr("discover_tuya_ip", dev.id)?.toString()
+                            val result = module.callAttr("discover_tuya_ip", dev.id)
+                            if (result != null && result.toString() != "None") {
+                                result.toString()
+                            } else {
+                                null
+                            }
                         } catch (e: Exception) {
+                            Log.e("DeviceDetails", "Erro ao descobrir IP", e)
                             null
                         }
                     }
                     
-                    if (discoveredIp != null && discoveredIp != "None") {
+                    if (discoveredIp != null && discoveredIp.isNotBlank()) {
                         dev.lanIp = discoveredIp
                         deviceIp.text = "IP Local: $discoveredIp"
                         
@@ -125,6 +136,7 @@ class DeviceDetailsActivity : AppCompatActivity() {
                         Toast.makeText(this@DeviceDetailsActivity, "IP não encontrado. Verifique se o dispositivo está na mesma rede.", Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
+                    Log.e("DeviceDetails", "Erro ao descobrir IP", e)
                     Toast.makeText(this@DeviceDetailsActivity, "Erro ao descobrir IP: ${e.message}", Toast.LENGTH_LONG).show()
                 } finally {
                     discoverIpButton.isEnabled = true
