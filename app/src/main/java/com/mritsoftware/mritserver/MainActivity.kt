@@ -174,18 +174,20 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val result = module.callAttr("scan_devices")
                         if (result != null) {
-                            val resultDict = result.asDict()
-                            val devicesMap = mutableMapOf<String, Map<String, Any>>()
+                            // Converter PyObject para Map usando a API do Chaquopy
+                            val devicesMap = mutableMapOf<String, Map<String, String>>()
                             
-                            for (key in resultDict.keys()) {
-                                val deviceInfo = resultDict[key]?.asDict()
-                                if (deviceInfo != null) {
-                                    val deviceMap = mutableMapOf<String, Any>()
-                                    for (infoKey in deviceInfo.keys()) {
-                                        deviceMap[infoKey.toString()] = deviceInfo[infoKey]?.toString() ?: ""
-                                    }
-                                    devicesMap[key.toString()] = deviceMap
+                            // Iterar sobre as chaves do dicionário Python
+                            val pyDict = result.asMap()
+                            for ((key, value) in pyDict) {
+                                val deviceId = key.toString()
+                                val deviceInfo = value?.asMap() ?: emptyMap()
+                                
+                                val deviceMap = mutableMapOf<String, String>()
+                                for ((infoKey, infoValue) in deviceInfo) {
+                                    deviceMap[infoKey.toString()] = infoValue?.toString() ?: ""
                                 }
+                                devicesMap[deviceId] = deviceMap
                             }
                             devicesMap
                         } else {
@@ -203,7 +205,7 @@ class MainActivity : AppCompatActivity() {
                     val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
                     
                     for ((deviceId, deviceInfo) in scanResult) {
-                        val ip = deviceInfo["ip"]?.toString() ?: ""
+                        val ip = deviceInfo["ip"] ?: ""
                         val savedName = prefs.getString("device_${deviceId}_name", null)
                         val name = savedName ?: "Dispositivo ${deviceId.take(8)}"
                         
