@@ -99,7 +99,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Atualizar Dispositivos"
-                android:textSize="16sp"
+                android:textSize="18sp"
                 android:layout_marginTop="20dp"
                 android:backgroundTint="#9C27B0"
                 style="@style/Widget.Material3.Button" />

@@ -54,51 +54,34 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="ID: -"
-                android:textSize="14sp"
+                android:textSize="16sp"
                 android:textColor="@android:color/black"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="16dp" />
 
             <TextView
                 android:id="@+id/deviceIp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="IP Local: -"
-                android:textSize="14sp"
+                android:textSize="16sp"
                 android:textColor="@android:color/black"
-                android:layout_marginBottom="12dp" />
-
-            <TextView
-                android:id="@+id/localKey"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Local Key: -"
-                android:textSize="14sp"
-                android:textColor="@android:color/black"
-                android:layout_marginBottom="12dp" />
-
-            <TextView
-                android:id="@+id/deviceType"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Tipo: -"
-                android:textSize="14sp"
-                android:textColor="@android:color/black"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="16dp" />
 
             <TextView
                 android:id="@+id/deviceStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Status: -"
-                android:textSize="14sp"
+                android:textSize="16sp"
                 android:textColor="@android:color/black"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="24dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/discoverIpButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Descobrir IP Local"
+                android:textSize="16sp"
                 android:layout_marginTop="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
         </LinearLayout>

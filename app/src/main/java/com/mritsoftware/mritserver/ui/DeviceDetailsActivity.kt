@@ -19,9 +19,7 @@ class DeviceDetailsActivity : AppCompatActivity() {
     private lateinit var deviceName: TextView
     private lateinit var deviceId: TextView
     private lateinit var deviceIp: TextView
-    private lateinit var deviceType: TextView
     private lateinit var deviceStatus: TextView
-    private lateinit var localKey: TextView
     private lateinit var discoverIpButton: MaterialButton
     private lateinit var deviceCard: MaterialCardView
     
@@ -60,9 +58,7 @@ class DeviceDetailsActivity : AppCompatActivity() {
         deviceName = findViewById(R.id.deviceName)
         deviceId = findViewById(R.id.deviceId)
         deviceIp = findViewById(R.id.deviceIp)
-        deviceType = findViewById(R.id.deviceType)
         deviceStatus = findViewById(R.id.deviceStatus)
-        localKey = findViewById(R.id.localKey)
         discoverIpButton = findViewById(R.id.discoverIpButton)
         deviceCard = findViewById(R.id.deviceCard)
     }
@@ -70,16 +66,21 @@ class DeviceDetailsActivity : AppCompatActivity() {
     private fun loadDeviceInfo() {
         device?.let { dev ->
             deviceName.text = dev.name
-            deviceId.text = "ID: ${dev.id}"
-            deviceType.text = "Tipo: ${dev.type.name}"
+            
+            // Mostrar apenas os últimos 5 caracteres do ID
+            val deviceIdFull = dev.id
+            val deviceIdMasked = if (deviceIdFull.length > 5) {
+                "***${deviceIdFull.takeLast(5)}"
+            } else {
+                deviceIdFull
+            }
+            deviceId.text = "ID: $deviceIdMasked"
+            
             deviceStatus.text = if (dev.isOnline) "Status: Online" else "Status: Offline"
             
-            // Buscar local_key e IP do SharedPreferences
+            // Buscar IP do SharedPreferences
             val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
-            val savedLocalKey = prefs.getString("device_${dev.id}_local_key", null)
             val savedIp = prefs.getString("device_${dev.id}_ip", null)
-            
-            localKey.text = "Local Key: ${savedLocalKey ?: "Não configurada"}"
             
             // Se tiver IP salvo, usar ele
             if (savedIp != null && dev.lanIp == null) {
