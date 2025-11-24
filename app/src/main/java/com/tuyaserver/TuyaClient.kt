@@ -3,6 +3,7 @@ package com.tuyaserver
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.util.Log
+import com.tuyaserver.LogCollector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -55,8 +56,11 @@ class TuyaClient(private val context: Context? = null) {
         
         try {
             Log.d(TAG, "[INFO] ========================================")
+            LogCollector.addLog(TAG, "[INFO] ========================================", "I")
             Log.d(TAG, "[INFO] Enviando '$action' → $deviceId @ $lanIp (protocolo 3.4)")
+            LogCollector.addLog(TAG, "[INFO] Enviando '$action' → $deviceId @ $lanIp (protocolo 3.4)", "I")
             Log.d(TAG, "[INFO] Local Key: ${localKey.take(5)}... (${localKey.length} chars)")
+            LogCollector.addLog(TAG, "[INFO] Local Key: ${localKey.take(5)}... (${localKey.length} chars)", "I")
             
             // Protocolo 3.4: cria payload com timestamp
             val timestamp = (System.currentTimeMillis() / 1000).toInt()
@@ -66,15 +70,19 @@ class TuyaClient(private val context: Context? = null) {
             val jsonCommand = "{\"t\":$timestamp,\"dps\":{\"1\":$dpsValue}}"
             
             Log.d(TAG, "[DEBUG] JSON payload: $jsonCommand")
+            LogCollector.addLog(TAG, "[DEBUG] JSON payload: $jsonCommand", "D")
             
             // Criptografa payload
             val payload = jsonCommand.toByteArray(Charsets.UTF_8)
             Log.d(TAG, "[DEBUG] Payload antes de criptografar: ${payload.size} bytes")
+            LogCollector.addLog(TAG, "[DEBUG] Payload antes de criptografar: ${payload.size} bytes", "D")
             Log.d(TAG, "[DEBUG] Payload hex: ${payload.joinToString(" ") { "%02X".format(it) }}")
             
             val encrypted = encrypt(payload, localKey)
             Log.d(TAG, "[DEBUG] Payload criptografado: ${encrypted.size} bytes")
+            LogCollector.addLog(TAG, "[DEBUG] Payload criptografado: ${encrypted.size} bytes", "D")
             Log.d(TAG, "[DEBUG] Encrypted hex (primeiros 32): ${encrypted.take(32).joinToString(" ") { "%02X".format(it) }}")
+            LogCollector.addLog(TAG, "[DEBUG] Encrypted hex (primeiros 32): ${encrypted.take(32).joinToString(" ") { "%02X".format(it) }}", "D")
             
             // Tenta múltiplas vezes (como tinytuya faz)
             var success = false
@@ -92,26 +100,33 @@ class TuyaClient(private val context: Context? = null) {
                 val response1 = sendUdpPacket(lanIp, PORT, packet1)
                 if (response1 != null && response1.isNotEmpty()) {
                     Log.d(TAG, "[OK] ✅ Comando enviado com sucesso (tentativa $attempt, sequence=timestamp)")
+                    LogCollector.addLog(TAG, "[OK] ✅ Comando enviado com sucesso (tentativa $attempt, sequence=timestamp)", "I")
                     Log.d(TAG, "[OK] Resposta recebida: ${response1.size} bytes")
+                    LogCollector.addLog(TAG, "[OK] Resposta recebida: ${response1.size} bytes", "I")
                     success = true
                     break
                 } else {
                     Log.w(TAG, "[WARN] Sem resposta (sequence=timestamp)")
+                    LogCollector.addLog(TAG, "[WARN] Sem resposta (sequence=timestamp)", "W")
                 }
                 
                 delay(300)
                 
                 // Tenta com sequence = 0
                 Log.d(TAG, "[INFO] Tentando com sequence=0")
+                LogCollector.addLog(TAG, "[INFO] Tentando com sequence=0", "I")
                 val packet2 = buildPacket(encrypted, 0, useTimestamp = false)
                 val response2 = sendUdpPacket(lanIp, PORT, packet2)
                 if (response2 != null && response2.isNotEmpty()) {
                     Log.d(TAG, "[OK] ✅ Comando enviado com sucesso (tentativa $attempt, sequence=0)")
+                    LogCollector.addLog(TAG, "[OK] ✅ Comando enviado com sucesso (tentativa $attempt, sequence=0)", "I")
                     Log.d(TAG, "[OK] Resposta recebida: ${response2.size} bytes")
+                    LogCollector.addLog(TAG, "[OK] Resposta recebida: ${response2.size} bytes", "I")
                     success = true
                     break
                 } else {
                     Log.w(TAG, "[WARN] Sem resposta (sequence=0)")
+                    LogCollector.addLog(TAG, "[WARN] Sem resposta (sequence=0)", "W")
                 }
                 
                 delay(300)
@@ -250,22 +265,30 @@ class TuyaClient(private val context: Context? = null) {
             val packet = DatagramPacket(data, data.size, address, port)
             
             Log.d(TAG, "[UDP] Enviando ${data.size} bytes para $ip:$port")
+            LogCollector.addLog(TAG, "[UDP] Enviando ${data.size} bytes para $ip:$port", "I")
             Log.d(TAG, "[UDP] Socket local: ${socket.localAddress?.hostAddress}:${socket.localPort}")
+            LogCollector.addLog(TAG, "[UDP] Socket local: ${socket.localAddress?.hostAddress}:${socket.localPort}", "D")
             
             socket.send(packet)
             Log.d(TAG, "[UDP] ✅ Pacote enviado com sucesso")
+            LogCollector.addLog(TAG, "[UDP] ✅ Pacote enviado com sucesso", "I")
             
             // Tenta receber resposta
             val buffer = ByteArray(1024)
             val responsePacket = DatagramPacket(buffer, buffer.size)
             
             try {
+                Log.d(TAG, "[UDP] Aguardando resposta (timeout: ${TIMEOUT_MS}ms)...")
+                LogCollector.addLog(TAG, "[UDP] Aguardando resposta (timeout: ${TIMEOUT_MS}ms)...", "D")
                 socket.receive(responsePacket)
                 val response = ByteArray(responsePacket.length)
                 System.arraycopy(buffer, 0, response, 0, responsePacket.length)
                 Log.d(TAG, "[UDP] ✅ Resposta recebida: ${response.size} bytes de ${responsePacket.address.hostAddress}")
+                LogCollector.addLog(TAG, "[UDP] ✅ Resposta recebida: ${response.size} bytes de ${responsePacket.address.hostAddress}", "I")
                 return response
             } catch (e: java.net.SocketTimeoutException) {
+                Log.w(TAG, "[UDP] ⏱️ Timeout aguardando resposta")
+                LogCollector.addLog(TAG, "[UDP] ⏱️ Timeout aguardando resposta", "W")
                 return null
             }
             
