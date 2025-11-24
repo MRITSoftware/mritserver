@@ -95,6 +95,32 @@
                 android:text="Atualizar Dispositivos"
                 android:layout_marginTop="16dp"
                 style="@style/Widget.Material3.Button" />
+            
+            <!-- Rodapé com Copyright -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="24dp"
+                android:layout_marginTop="32dp">
+                
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="© 2025 MRIT Software"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/darker_gray"
+                    android:layout_marginBottom="4dp" />
+                
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Todos os direitos reservados"
+                    android:textSize="10sp"
+                    android:textColor="@android:color/darker_gray"
+                    android:alpha="0.7" />
+            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 

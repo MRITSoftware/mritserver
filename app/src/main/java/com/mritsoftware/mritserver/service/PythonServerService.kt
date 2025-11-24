@@ -1,12 +1,16 @@
 package com.mritsoftware.mritserver.service
 
-import android.app.Service
+import android.app.*
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.mritsoftware.mritserver.MainActivity
+import com.mritsoftware.mritserver.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,12 +18,15 @@ import kotlinx.coroutines.launch
 class PythonServerService : Service() {
     
     private val TAG = "PythonServerService"
+    private val NOTIFICATION_ID = 1
+    private val CHANNEL_ID = "tuya_server_channel"
     private var pythonThread: Thread? = null
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Service criado")
+        createNotificationChannel()
         
         // Inicializar Python se ainda não foi inicializado
         if (!Python.isStarted()) {
@@ -29,8 +36,43 @@ class PythonServerService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Iniciar como foreground service para rodar em background
+        startForeground(NOTIFICATION_ID, createNotification())
         startPythonServer()
         return START_STICKY // Serviço será reiniciado se for morto
+    }
+    
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Servidor Tuya",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Servidor Tuya rodando em background"
+                setShowBadge(false)
+            }
+            
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+    
+    private fun createNotification(): Notification {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("MRIT Server")
+            .setContentText("Servidor Tuya rodando na porta 8000")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
     
     private fun startPythonServer() {
@@ -70,7 +112,7 @@ class PythonServerService : Service() {
             val module = python.getModule("tuya_server")
             
             // Atualizar site_name no Python
-            val configPath = module.callAttr("create_config_if_needed")
+            module.callAttr("update_site_name", siteName)
             
             Log.d(TAG, "Site name configurado: $siteName")
         } catch (e: Exception) {

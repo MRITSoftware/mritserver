@@ -23,10 +23,22 @@ except ImportError:
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 
 def create_config_if_needed():
-    """Cria o config.json pedindo o nome do site/tablet na primeira execução."""
+    """Cria o config.json com nome do site/tablet."""
     if not os.path.exists(CONFIG_PATH):
-        # No Android, usar um nome padrão ou buscar do SharedPreferences
+        # No Android, tentar buscar do SharedPreferences via Java
         site = "ANDROID_DEVICE"
+        
+        try:
+            from android import mActivity
+            from jnius import autoclass
+            Context = autoclass("android.content.Context")
+            SharedPreferences = autoclass("android.content.SharedPreferences")
+            
+            # Tentar obter do SharedPreferences
+            prefs = mActivity.getSharedPreferences("TuyaGateway", Context.MODE_PRIVATE)
+            site = prefs.getString("site_name", "ANDROID_DEVICE") or "ANDROID_DEVICE"
+        except:
+            pass
         
         cfg = {
             "site_name": site
@@ -37,14 +49,27 @@ def create_config_if_needed():
         
         print(f"[OK] config.json criado com site_name = {site}")
 
+def update_site_name(new_name: str):
+    """Atualiza o nome do site no config.json"""
+    cfg = {
+        "site_name": new_name
+    }
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=4, ensure_ascii=False)
+    global SITE_NAME
+    SITE_NAME = new_name
+    print(f"[OK] site_name atualizado para = {new_name}")
+
 # cria se não existir
 create_config_if_needed()
 
 # carrega o config
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    cfg = json.load(f)
-
-SITE_NAME: str = cfg.get("site_name", "SITE_DESCONHECIDO")
+if os.path.exists(CONFIG_PATH):
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+    SITE_NAME: str = cfg.get("site_name", "SITE_DESCONHECIDO")
+else:
+    SITE_NAME = "SITE_DESCONHECIDO"
 
 print(f"[INFO] Servidor local iniciado para SITE = {SITE_NAME}")
 
@@ -152,16 +177,34 @@ def send_tuya_command(
     log(f"[INFO] [{SITE_NAME}] Enviando '{action}' → {tuya_device_id} @ {lan_ip}")
     
     d = tinytuya.OutletDevice(tuya_device_id, lan_ip, local_key)
-    d.set_version(3.4)
     
-    if action == "on":
-        resp = d.turn_on()
-    elif action == "off":
-        resp = d.turn_off()
-    else:
-        raise ValueError(f"Ação inválida: {action}")
+    # Tentar versão 3.3 primeiro, depois 3.4 se falhar
+    success = False
+    last_error = None
     
-    log(f"[DEBUG] Resposta do dispositivo: {resp}")
+    for version in [3.3, 3.4]:
+        try:
+            d.set_version(version)
+            log(f"[DEBUG] Tentando protocolo versão {version}")
+            
+            if action == "on":
+                resp = d.turn_on()
+            elif action == "off":
+                resp = d.turn_off()
+            else:
+                raise ValueError(f"Ação inválida: {action}")
+            
+            log(f"[DEBUG] Resposta do dispositivo (v{version}): {resp}")
+            success = True
+            break
+            
+        except Exception as e:
+            last_error = e
+            log(f"[DEBUG] Erro com versão {version}: {e}")
+            continue
+    
+    if not success:
+        raise RuntimeError(f"Falha ao enviar comando após tentar versões 3.3 e 3.4: {last_error}")
 
 # =========================
 # API HTTP
