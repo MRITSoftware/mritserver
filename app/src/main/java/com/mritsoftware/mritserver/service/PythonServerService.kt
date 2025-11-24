@@ -111,7 +111,10 @@ class PythonServerService : Service() {
             val python = Python.getInstance()
             val module = python.getModule("tuya_server")
             
-            // Atualizar site_name no Python
+            // Garantir que config existe
+            module.callAttr("create_config_if_needed")
+            
+            // Atualizar site_name
             module.callAttr("update_site_name", siteName)
             
             Log.d(TAG, "Site name configurado: $siteName")
