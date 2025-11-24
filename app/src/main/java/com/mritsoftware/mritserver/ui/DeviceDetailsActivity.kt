@@ -70,14 +70,23 @@ class DeviceDetailsActivity : AppCompatActivity() {
         device?.let { dev ->
             deviceName.text = dev.name
             deviceId.text = "ID: ${dev.id}"
-            deviceIp.text = "IP Local: ${dev.lanIp ?: "Não configurado"}"
             deviceType.text = "Tipo: ${dev.type.name}"
             deviceStatus.text = if (dev.isOnline) "Status: Online" else "Status: Offline"
             
-            // Buscar local_key do SharedPreferences
+            // Buscar local_key e IP do SharedPreferences
             val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
             val savedLocalKey = prefs.getString("device_${dev.id}_local_key", null)
+            val savedIp = prefs.getString("device_${dev.id}_ip", null)
+            
             localKey.text = "Local Key: ${savedLocalKey ?: "Não configurada"}"
+            
+            // Se tiver IP salvo, usar ele
+            if (savedIp != null && dev.lanIp == null) {
+                dev.lanIp = savedIp
+            }
+            
+            // Atualizar IP se tiver
+            deviceIp.text = "IP Local: ${dev.lanIp ?: savedIp ?: "Não configurado"}"
             
             // Cor do status
             deviceStatus.setTextColor(
