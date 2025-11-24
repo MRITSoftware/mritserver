@@ -29,16 +29,16 @@ def create_config_if_needed():
         site = "ANDROID_DEVICE"
         
         try:
-            from android import mActivity
             from jnius import autoclass
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
             Context = autoclass("android.content.Context")
-            SharedPreferences = autoclass("android.content.SharedPreferences")
             
-            # Tentar obter do SharedPreferences
-            prefs = mActivity.getSharedPreferences("TuyaGateway", Context.MODE_PRIVATE)
-            site = prefs.getString("site_name", "ANDROID_DEVICE") or "ANDROID_DEVICE"
-        except:
-            pass
+            activity = PythonActivity.mActivity
+            if activity:
+                prefs = activity.getSharedPreferences("TuyaGateway", Context.MODE_PRIVATE)
+                site = prefs.getString("site_name", "ANDROID_DEVICE") or "ANDROID_DEVICE"
+        except Exception as e:
+            print(f"[WARN] Não foi possível ler SharedPreferences: {e}")
         
         cfg = {
             "site_name": site
