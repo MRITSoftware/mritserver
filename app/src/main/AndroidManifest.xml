@@ -43,7 +43,7 @@
             android:parentActivityName=".MainActivity" />
         
         <service
-            android:name=".service.ServerService"
+            android:name=".service.PythonServerService"
             android:enabled="true"
             android:exported="false" />
     </application>

@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.mritsoftware.mritserver.adapter.DeviceAdapter
 import com.mritsoftware.mritserver.model.TuyaDevice
-import com.mritsoftware.mritserver.service.ServerService
+import com.mritsoftware.mritserver.service.PythonServerService
 import com.mritsoftware.mritserver.ui.SettingsActivity
 import com.mritsoftware.mritserver.ui.DeviceDiscoveryActivity
 import android.content.Intent
@@ -45,19 +45,41 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startServerService() {
-        val intent = Intent(this, ServerService::class.java)
+        val intent = Intent(this, PythonServerService::class.java)
         startService(intent)
         
         // Atualizar status após um pequeno delay para o servidor iniciar
         coroutineScope.launch {
-            kotlinx.coroutines.delay(1000)
+            kotlinx.coroutines.delay(2000) // Dar mais tempo para Python inicializar
             updateServerStatus()
         }
     }
     
     private fun updateServerStatus() {
-        gatewayStatus.text = "Servidor rodando na porta 8000"
-        gatewayStatus.setTextColor(getColor(R.color.teal_700))
+        coroutineScope.launch {
+            try {
+                // Verificar se o servidor está respondendo
+                val url = java.net.URL("http://127.0.0.1:8000/health")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 2000
+                connection.readTimeout = 2000
+                
+                val responseCode = connection.responseCode
+                connection.disconnect()
+                
+                if (responseCode == 200) {
+                    gatewayStatus.text = "Servidor Python rodando na porta 8000"
+                    gatewayStatus.setTextColor(getColor(R.color.teal_700))
+                } else {
+                    gatewayStatus.text = "Servidor iniciando..."
+                    gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+                }
+            } catch (e: Exception) {
+                gatewayStatus.text = "Servidor iniciando..."
+                gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+            }
+        }
     }
     
     override fun onDestroy() {

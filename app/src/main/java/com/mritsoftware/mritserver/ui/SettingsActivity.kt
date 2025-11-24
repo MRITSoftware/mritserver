@@ -6,7 +6,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.mritsoftware.mritserver.R
-import com.mritsoftware.mritserver.service.FlaskService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,9 +13,9 @@ import kotlinx.coroutines.launch
 class SettingsActivity : AppCompatActivity() {
     
     private lateinit var serverUrlInput: TextInputEditText
+    private lateinit var siteNameInput: TextInputEditText
     private lateinit var testButton: MaterialButton
     private lateinit var saveButton: MaterialButton
-    private lateinit var flaskService: FlaskService
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,11 +40,13 @@ class SettingsActivity : AppCompatActivity() {
     
     private fun setupViews() {
         serverUrlInput = findViewById(R.id.serverUrlInput)
+        siteNameInput = findViewById(R.id.siteNameInput)
         testButton = findViewById(R.id.testButton)
         saveButton = findViewById(R.id.saveButton)
         
-        // Preencher com URL atual
-        serverUrlInput.setText(flaskService.getServerUrl())
+        val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
+        serverUrlInput.setText("http://0.0.0.0:8000")
+        siteNameInput.setText(prefs.getString("site_name", "ANDROID_DEVICE") ?: "ANDROID_DEVICE")
     }
     
     private fun setupListeners() {
@@ -59,49 +60,74 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun testConnection() {
-        val url = serverUrlInput.text?.toString()?.trim() ?: ""
-        
-        if (url.isBlank()) {
-            Toast.makeText(this, "Digite a URL do servidor", Toast.LENGTH_SHORT).show()
-            return
-        }
-        
         testButton.isEnabled = false
         testButton.text = "Testando..."
         
-        CoroutineScope(Dispatchers.Main).launch {
-            val isValid = flaskService.checkServerHealth()
-            
-            testButton.isEnabled = true
-            testButton.text = "Testar Conexão"
-            
-            if (isValid) {
-                val siteInfo = flaskService.getSiteInfo()
-                Toast.makeText(
-                    this@SettingsActivity,
-                    "Conexão OK! Site: ${siteInfo ?: "N/A"}",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else {
-                Toast.makeText(
-                    this@SettingsActivity,
-                    "Erro ao conectar. Verifique a URL e se o servidor está rodando.",
-                    Toast.LENGTH_LONG
-                ).show()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val url = java.net.URL("http://127.0.0.1:8000/health")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 2000
+                connection.readTimeout = 2000
+                
+                val responseCode = connection.responseCode
+                val response = if (responseCode == 200) {
+                    val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
+                    val responseText = reader.readText()
+                    reader.close()
+                    org.json.JSONObject(responseText)
+                } else {
+                    null
+                }
+                
+                connection.disconnect()
+                
+                CoroutineScope(Dispatchers.Main).launch {
+                    testButton.isEnabled = true
+                    testButton.text = "Testar Conexão"
+                    
+                    if (responseCode == 200 && response != null) {
+                        val site = response.optString("site", "N/A")
+                        Toast.makeText(
+                            this@SettingsActivity,
+                            "Servidor OK! Site: $site",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            this@SettingsActivity,
+                            "Servidor não está respondendo. Aguarde alguns segundos.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    testButton.isEnabled = true
+                    testButton.text = "Testar Conexão"
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "Erro: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
     
     private fun saveSettings() {
-        val url = serverUrlInput.text?.toString()?.trim() ?: ""
+        val siteName = siteNameInput.text?.toString()?.trim() ?: ""
         
-        if (url.isBlank()) {
-            Toast.makeText(this, "Digite a URL do servidor", Toast.LENGTH_SHORT).show()
+        if (siteName.isBlank()) {
+            Toast.makeText(this, "Digite o nome do site", Toast.LENGTH_SHORT).show()
             return
         }
         
-        flaskService.setServerUrl(url)
-        Toast.makeText(this, "Configurações salvas!", Toast.LENGTH_SHORT).show()
+        val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
+        prefs.edit().putString("site_name", siteName).apply()
+        
+        Toast.makeText(this, "Configurações salvas! Reinicie o app para aplicar.", Toast.LENGTH_LONG).show()
         finish()
     }
 }
