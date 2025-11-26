@@ -92,8 +92,8 @@ class DeviceDetailsActivity : AppCompatActivity() {
             
             // Cor do status
             deviceStatus.setTextColor(
-                if (dev.isOnline) getColor(R.color.teal_700)
-                else getColor(android.R.color.holo_red_dark)
+                if (dev.isOnline) getColor(R.color.status_online)
+                else getColor(R.color.status_offline)
             )
         }
     }

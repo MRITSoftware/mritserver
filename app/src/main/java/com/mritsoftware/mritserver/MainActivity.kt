@@ -80,13 +80,14 @@ class MainActivity : AppCompatActivity() {
                 
                 if (responseCode == 200) {
                     gatewayStatus.text = "Servidor rodando na porta 8000"
-                    gatewayStatus.setTextColor(getColor(R.color.teal_700))
+                    gatewayStatus.setTextColor(getColor(R.color.status_online))
                 } else {
                     gatewayStatus.text = "Servidor iniciando..."
-                    gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+                    gatewayStatus.setTextColor(getColor(R.color.status_warning))
                 }
             } catch (e: Exception) {
                 gatewayStatus.text = "Servidor iniciando..."
+                gatewayStatus.setTextColor(getColor(R.color.status_offline))
                 gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
             }
         }

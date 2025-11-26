@@ -4,7 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.cardview.widget.CardView
+import com.google.android.material.card.MaterialCardView
 import androidx.recyclerview.widget.RecyclerView
 import com.mritsoftware.mritserver.R
 import com.mritsoftware.mritserver.model.TuyaDevice
@@ -15,7 +15,7 @@ class DeviceAdapter(
 ) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
 
     class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val cardView: CardView = itemView.findViewById(R.id.deviceCard)
+        val cardView: MaterialCardView = itemView.findViewById(R.id.deviceCard)
         val deviceName: TextView = itemView.findViewById(R.id.deviceName)
         val deviceType: TextView = itemView.findViewById(R.id.deviceType)
         val deviceStatus: TextView = itemView.findViewById(R.id.deviceStatus)
@@ -34,9 +34,29 @@ class DeviceAdapter(
         holder.deviceName.text = device.id
         holder.deviceType.text = "Tipo: ${device.type.name}"
         holder.deviceStatus.text = if (device.isOnline) "Online" else "Offline"
-        holder.deviceStatus.setTextColor(
-            if (device.isOnline) 0xFF4ECDC4.toInt() else 0xFFB0B0B0.toInt()
-        )
+        val statusColor = if (device.isOnline) {
+            holder.itemView.context.getColor(com.mritsoftware.mritserver.R.color.status_online)
+        } else {
+            holder.itemView.context.getColor(com.mritsoftware.mritserver.R.color.status_offline)
+        }
+        holder.deviceStatus.setTextColor(statusColor)
+        
+        // Atualizar indicador de status
+        val statusIndicator = holder.itemView.findViewById<android.view.View>(com.mritsoftware.mritserver.R.id.statusIndicator)
+        if (statusIndicator != null) {
+            val drawable = if (device.isOnline) {
+                android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(statusColor)
+                }
+            } else {
+                android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(statusColor)
+                }
+            }
+            statusIndicator.background = drawable
+        }
         
         holder.cardView.setOnClickListener {
             onDeviceClick(device)
