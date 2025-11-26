@@ -1,24 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark Blue Theme Colors -->
     <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#1E3A5F</color>
-    <color name="purple_700">#152A44</color>
-    <color name="teal_200">#03DAC5</color>
-    <color name="teal_700">#018786</color>
-    <color name="black">#000000</color>
-    <color name="white">#FFFFFF</color>
-    
-    <!-- Dark Blue Palette -->
-    <color name="dark_blue_primary">#1E3A5F</color>
-    <color name="dark_blue_primary_dark">#152A44</color>
-    <color name="dark_blue_primary_light">#2A4A6F</color>
-    <color name="dark_blue_accent">#4A90E2</color>
-    <color name="dark_blue_background">#0F1B2E</color>
-    <color name="dark_blue_surface">#1A2A3A</color>
-    <color name="dark_blue_text_primary">#FFFFFF</color>
-    <color name="dark_blue_text_secondary">#B0BEC5</color>
-    
-    <!-- Launcher Icon Colors -->
-    <color name="ic_launcher_background">#1E3A5F</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="ic_launcher_background">#FF6200EE</color>
 </resources>
