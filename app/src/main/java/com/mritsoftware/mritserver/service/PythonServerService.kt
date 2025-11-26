@@ -81,21 +81,39 @@ class PythonServerService : Service() {
             return
         }
         
+        // Garantir que Python está inicializado
+        if (!Python.isStarted()) {
+            Log.d(TAG, "Python não está inicializado, inicializando...")
+            try {
+                Python.start(AndroidPlatform(this))
+                Log.d(TAG, "Python inicializado com sucesso")
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao inicializar Python", e)
+                return
+            }
+        }
+        
         // Atualizar site_name se necessário
         updateSiteName()
         
         pythonThread = Thread {
             try {
+                Log.d(TAG, "Thread do servidor iniciada, obtendo instância Python...")
                 val python = Python.getInstance()
+                Log.d(TAG, "Obtendo módulo tuya_server...")
                 val module = python.getModule("tuya_server")
+                Log.d(TAG, "Módulo tuya_server obtido com sucesso")
                 
-                Log.d(TAG, "Iniciando servidor Flask Python...")
+                Log.d(TAG, "Chamando start_server(0.0.0.0, 8000)...")
                 
                 // Iniciar servidor Flask em thread separada
                 module.callAttr("start_server", "0.0.0.0", 8000)
                 
+                Log.d(TAG, "Servidor Flask iniciado")
+                
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao iniciar servidor Python", e)
+                e.printStackTrace()
             }
         }
         

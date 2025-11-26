@@ -72,7 +72,7 @@ class DeviceDiscoveryActivity : AppCompatActivity() {
         coroutineScope.launch {
             try {
                 val discovered = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    TuyaProtocol.discoverDevices(timeout = 5000)
+                    TuyaProtocol.discoverDevices(context = this@DeviceDiscoveryActivity, timeout = 5000)
                 }
                 
                 discovered.forEach { (deviceId, ip) ->

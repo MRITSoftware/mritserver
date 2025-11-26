@@ -1,5 +1,7 @@
 package com.mritsoftware.mritserver.tuya
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import android.util.Log
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -156,22 +158,44 @@ object TuyaProtocol {
     
     /**
      * Descobre dispositivos Tuya na rede local
+     * @param context Contexto Android (necessário para MulticastLock)
+     * @param timeout Timeout em milissegundos
      */
-    fun discoverDevices(timeout: Int = 5000): Map<String, String> {
+    fun discoverDevices(context: Context? = null, timeout: Int = 5000): Map<String, String> {
         val devices = mutableMapOf<String, String>()
+        var multicastLock: WifiManager.MulticastLock? = null
         
         try {
+            // Obter MulticastLock se contexto foi fornecido (necessário no Android)
+            if (context != null) {
+                try {
+                    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    multicastLock = wifiManager?.createMulticastLock("TuyaDiscovery")
+                    multicastLock?.setReferenceCounted(true)
+                    multicastLock?.acquire()
+                    Log.d(TAG, "MulticastLock adquirido")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Não foi possível adquirir MulticastLock", e)
+                }
+            }
+            
             val socket = DatagramSocket()
             socket.broadcast = true
             socket.soTimeout = timeout
             
-            // Habilitar multicast (necessário no Android)
+            // Habilitar reuse address (necessário para multicast)
             try {
-                val multicastLock = socket.javaClass.getDeclaredMethod("setReuseAddress", Boolean::class.java)
-                multicastLock.isAccessible = true
-                multicastLock.invoke(socket, true)
+                val reuseAddressMethod = socket.javaClass.getMethod("setReuseAddress", Boolean::class.java)
+                reuseAddressMethod.invoke(socket, true)
             } catch (e: Exception) {
-                Log.w(TAG, "Não foi possível habilitar reuse address", e)
+                try {
+                    // Tentar propriedade direta se método não existir
+                    val field = socket.javaClass.getDeclaredField("reuseAddress")
+                    field.isAccessible = true
+                    field.setBoolean(socket, true)
+                } catch (e2: Exception) {
+                    Log.w(TAG, "Não foi possível habilitar reuse address", e2)
+                }
             }
             
             // Pacote de descoberta Tuya
@@ -217,6 +241,14 @@ object TuyaProtocol {
             Log.d(TAG, "Descoberta concluída: $responseCount resposta(s), ${devices.size} dispositivo(s) identificado(s)")
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao descobrir dispositivos", e)
+        } finally {
+            // Liberar MulticastLock
+            try {
+                multicastLock?.release()
+                Log.d(TAG, "MulticastLock liberado")
+            } catch (e: Exception) {
+                Log.w(TAG, "Erro ao liberar MulticastLock", e)
+            }
         }
         
         return devices
