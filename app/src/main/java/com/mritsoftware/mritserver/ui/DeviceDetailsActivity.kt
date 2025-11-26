@@ -2,15 +2,21 @@ package com.mritsoftware.mritserver.ui
 
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.animation.AnimationUtils
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.mritsoftware.mritserver.R
 import com.mritsoftware.mritserver.model.TuyaDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -21,9 +27,12 @@ class DeviceDetailsActivity : AppCompatActivity() {
     private lateinit var deviceIp: TextView
     private lateinit var deviceStatus: TextView
     private lateinit var discoverIpButton: MaterialButton
+    private lateinit var turnOnButton: MaterialButton
+    private lateinit var turnOffButton: MaterialButton
     private lateinit var deviceCard: MaterialCardView
     
     private var device: TuyaDevice? = null
+    private var connectingBottomSheet: BottomSheetDialog? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +69,8 @@ class DeviceDetailsActivity : AppCompatActivity() {
         deviceIp = findViewById(R.id.deviceIp)
         deviceStatus = findViewById(R.id.deviceStatus)
         discoverIpButton = findViewById(R.id.discoverIpButton)
+        turnOnButton = findViewById(R.id.turnOnButton)
+        turnOffButton = findViewById(R.id.turnOffButton)
         deviceCard = findViewById(R.id.deviceCard)
     }
     
@@ -102,6 +113,119 @@ class DeviceDetailsActivity : AppCompatActivity() {
         discoverIpButton.setOnClickListener {
             discoverDeviceIp()
         }
+        
+        turnOnButton.setOnClickListener {
+            sendCommand("on")
+        }
+        
+        turnOffButton.setOnClickListener {
+            sendCommand("off")
+        }
+    }
+    
+    private fun sendCommand(action: String) {
+        device?.let { dev ->
+            // Mostrar bottom sheet
+            showConnectingBottomSheet()
+            
+            coroutineScope.launch {
+                try {
+                    // Buscar local_key e IP
+                    val prefs = getSharedPreferences("TuyaGateway", MODE_PRIVATE)
+                    val localKey = prefs.getString("device_${dev.id}_local_key", null)
+                    val lanIp = dev.lanIp ?: prefs.getString("device_${dev.id}_ip", null) ?: "auto"
+                    
+                    if (localKey == null) {
+                        dismissConnectingBottomSheet()
+                        Toast.makeText(this@DeviceDetailsActivity, "Local Key não configurada para este dispositivo", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+                    
+                    // Enviar comando
+                    val success = withContext(Dispatchers.IO) {
+                        try {
+                            val url = java.net.URL("http://127.0.0.1:8000/tuya/command")
+                            val connection = url.openConnection() as java.net.HttpURLConnection
+                            connection.requestMethod = "POST"
+                            connection.setRequestProperty("Content-Type", "application/json")
+                            connection.doOutput = true
+                            connection.connectTimeout = 5000
+                            connection.readTimeout = 5000
+                            
+                            val jsonBody = org.json.JSONObject().apply {
+                                put("action", action)
+                                put("tuya_device_id", dev.id)
+                                put("local_key", localKey)
+                                put("lan_ip", lanIp)
+                            }
+                            
+                            val outputStream = connection.outputStream
+                            val writer = java.io.OutputStreamWriter(outputStream, "UTF-8")
+                            writer.write(jsonBody.toString())
+                            writer.flush()
+                            writer.close()
+                            
+                            val responseCode = connection.responseCode
+                            connection.disconnect()
+                            
+                            responseCode == 200
+                        } catch (e: Exception) {
+                            Log.e("DeviceDetails", "Erro ao enviar comando", e)
+                            false
+                        }
+                    }
+                    
+                    // Aguardar um pouco para mostrar a animação
+                    delay(1500)
+                    
+                    dismissConnectingBottomSheet()
+                    
+                    if (success) {
+                        Toast.makeText(this@DeviceDetailsActivity, "Comando enviado com sucesso", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@DeviceDetailsActivity, "Erro ao enviar comando", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    dismissConnectingBottomSheet()
+                    Log.e("DeviceDetails", "Erro ao enviar comando", e)
+                    Toast.makeText(this@DeviceDetailsActivity, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    
+    private fun showConnectingBottomSheet() {
+        val bottomSheetView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_connecting, null)
+        val bottomSheet = BottomSheetDialog(this)
+        bottomSheet.setContentView(bottomSheetView)
+        bottomSheet.setCancelable(false)
+        
+        val circleCard = bottomSheetView.findViewById<MaterialCardView>(R.id.circleCard)
+        val closeButton = bottomSheetView.findViewById<ImageButton>(R.id.closeButton)
+        
+        // Iniciar animação de rotação
+        circleCard?.let {
+            val rotateAnimation = AnimationUtils.loadAnimation(this, R.anim.rotate_animation)
+            it.startAnimation(rotateAnimation)
+        }
+        
+        // Botão fechar
+        closeButton?.setOnClickListener {
+            dismissConnectingBottomSheet()
+        }
+        
+        connectingBottomSheet = bottomSheet
+        bottomSheet.show()
+    }
+    
+    private fun dismissConnectingBottomSheet() {
+        connectingBottomSheet?.dismiss()
+        connectingBottomSheet = null
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        dismissConnectingBottomSheet()
     }
     
     private fun discoverDeviceIp() {
