@@ -122,8 +122,6 @@
                 android:letterSpacing="0.02"
                 android:layout_marginTop="24dp"
                 android:backgroundTint="@color/accent_primary"
-                android:cornerRadius="16dp"
-                app:strokeWidth="0dp"
                 style="@style/Widget.Material3.Button" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
