@@ -165,6 +165,15 @@ object TuyaProtocol {
             socket.broadcast = true
             socket.soTimeout = timeout
             
+            // Habilitar multicast (necessário no Android)
+            try {
+                val multicastLock = socket.javaClass.getDeclaredMethod("setReuseAddress", Boolean::class.java)
+                multicastLock.isAccessible = true
+                multicastLock.invoke(socket, true)
+            } catch (e: Exception) {
+                Log.w(TAG, "Não foi possível habilitar reuse address", e)
+            }
+            
             // Pacote de descoberta Tuya
             val discoveryPacket = buildDiscoveryPacket()
             val broadcastAddress = InetAddress.getByName("255.255.255.255")
@@ -176,28 +185,36 @@ object TuyaProtocol {
             )
             
             socket.send(packet)
-            Log.d(TAG, "Pacote de descoberta enviado")
+            Log.d(TAG, "Pacote de descoberta enviado para broadcast")
             
             // Tentar receber respostas
             val buffer = ByteArray(1024)
             val receivePacket = DatagramPacket(buffer, buffer.size)
             
             val startTime = System.currentTimeMillis()
+            var responseCount = 0
             while (System.currentTimeMillis() - startTime < timeout) {
                 try {
                     socket.receive(receivePacket)
+                    responseCount++
                     val deviceId = extractDeviceId(buffer)
                     val ip = receivePacket.address.hostAddress
                     if (deviceId != null && ip != null) {
                         devices[deviceId] = ip
                         Log.d(TAG, "Dispositivo encontrado: $deviceId @ $ip")
+                    } else {
+                        // Mesmo sem device ID, registrar o IP se recebemos uma resposta
+                        Log.d(TAG, "Resposta recebida de $ip (device ID não extraído)")
                     }
                 } catch (e: java.net.SocketTimeoutException) {
                     break
+                } catch (e: Exception) {
+                    Log.w(TAG, "Erro ao receber pacote", e)
                 }
             }
             
             socket.close()
+            Log.d(TAG, "Descoberta concluída: $responseCount resposta(s), ${devices.size} dispositivo(s) identificado(s)")
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao descobrir dispositivos", e)
         }

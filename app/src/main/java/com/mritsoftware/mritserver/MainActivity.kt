@@ -44,7 +44,8 @@ class MainActivity : AppCompatActivity() {
                 startServerService()
                 // Aguardar servidor iniciar antes de carregar dispositivos
                 coroutineScope.launch {
-                    kotlinx.coroutines.delay(3000) // Dar tempo para o servidor Python iniciar
+                    kotlinx.coroutines.delay(5000) // Dar mais tempo para o servidor Python iniciar
+                    updateServerStatus()
                     refreshDevices()
                 }
     }
@@ -72,8 +73,8 @@ class MainActivity : AppCompatActivity() {
                 val url = java.net.URL("http://127.0.0.1:8000/health")
                 val connection = url.openConnection() as java.net.HttpURLConnection
                 connection.requestMethod = "GET"
-                connection.connectTimeout = 2000
-                connection.readTimeout = 2000
+                connection.connectTimeout = 3000
+                connection.readTimeout = 3000
                 
                 val responseCode = connection.responseCode
                 connection.disconnect()
@@ -81,13 +82,16 @@ class MainActivity : AppCompatActivity() {
                 if (responseCode == 200) {
                     gatewayStatus.text = "Servidor rodando na porta 8000"
                     gatewayStatus.setTextColor(getColor(R.color.teal_700))
+                    Log.d("MainActivity", "Servidor está respondendo")
                 } else {
                     gatewayStatus.text = "Servidor iniciando..."
                     gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+                    Log.w("MainActivity", "Servidor retornou código: $responseCode")
                 }
             } catch (e: Exception) {
-                gatewayStatus.text = "Servidor iniciando..."
-                gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+                gatewayStatus.text = "Servidor desconectado"
+                gatewayStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                Log.e("MainActivity", "Erro ao verificar servidor", e)
             }
         }
     }
@@ -158,9 +162,29 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Escaneando dispositivos...", Toast.LENGTH_SHORT).show()
         coroutineScope.launch {
             try {
-                // Inicializar Python se necessário
-                if (!com.chaquo.python.Python.isStarted()) {
-                    com.chaquo.python.Python.start(com.chaquo.python.android.AndroidPlatform(this@MainActivity))
+                // Verificar se o servidor está rodando primeiro
+                val serverRunning = withContext(Dispatchers.IO) {
+                    try {
+                        val url = java.net.URL("http://127.0.0.1:8000/health")
+                        val connection = url.openConnection() as java.net.HttpURLConnection
+                        connection.requestMethod = "GET"
+                        connection.connectTimeout = 2000
+                        connection.readTimeout = 2000
+                        val responseCode = connection.responseCode
+                        connection.disconnect()
+                        responseCode == 200
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+                
+                if (!serverRunning) {
+                    Log.w("MainActivity", "Servidor Python não está respondendo, tentando inicializar...")
+                    // Inicializar Python se necessário
+                    if (!com.chaquo.python.Python.isStarted()) {
+                        com.chaquo.python.Python.start(com.chaquo.python.android.AndroidPlatform(this@MainActivity))
+                        kotlinx.coroutines.delay(2000) // Aguardar Python inicializar
+                    }
                 }
                 
                 val python = com.chaquo.python.Python.getInstance()
@@ -169,7 +193,10 @@ class MainActivity : AppCompatActivity() {
                 // Chamar scan_devices do Python
                 val scanResult = withContext(Dispatchers.IO) {
                     try {
+                        Log.d("MainActivity", "Chamando scan_devices do Python...")
                         val result = module.callAttr("scan_devices")
+                        Log.d("MainActivity", "scan_devices retornou: ${result != null}")
+                        
                         if (result != null) {
                             // Converter PyObject para Map usando a API do Chaquopy
                             val devicesMap = mutableMapOf<String, Map<String, String>>()
@@ -185,13 +212,14 @@ class MainActivity : AppCompatActivity() {
                                     deviceMap[infoKey.toString()] = infoValue?.toString() ?: ""
                                 }
                                 devicesMap[deviceId] = deviceMap
+                                Log.d("MainActivity", "Dispositivo encontrado: $deviceId")
                             }
                             devicesMap
                         } else {
                             null
                         }
                     } catch (e: Exception) {
-                        Log.e("MainActivity", "Erro ao escanear dispositivos", e)
+                        Log.e("MainActivity", "Erro ao escanear dispositivos via Python", e)
                         null
                     }
                 }
@@ -219,8 +247,10 @@ class MainActivity : AppCompatActivity() {
                     }
                     
                     Toast.makeText(this@MainActivity, "${devices.size} dispositivo(s) encontrado(s)", Toast.LENGTH_SHORT).show()
+                    Log.d("MainActivity", "${devices.size} dispositivo(s) adicionado(s) à lista")
                 } else {
                     Toast.makeText(this@MainActivity, "Nenhum dispositivo encontrado", Toast.LENGTH_SHORT).show()
+                    Log.d("MainActivity", "Nenhum dispositivo encontrado no scan")
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Erro ao buscar dispositivos", e)
