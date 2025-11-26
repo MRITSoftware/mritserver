@@ -1,0 +1,15 @@
+[33mb00cdbf[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m Remove ícone de lupa do menu; melhora contraste do botão Atualizar; adiciona botões ON/OFF na tela de detalhes; cria bottom sheet com círculo neon girando ao conectar
+[33m1ada58e[m Corrige erro: remove strokeWidth duplicado no item_device.xml
+[33mec864a7[m Redesign com tema dark azul: remove campo tipo dos dispositivos, mostra apenas últimos 5 dígitos e status, adiciona indicador animado neon para status do servidor
+[33m3be3d60[m Corrige erro de build: remove android:cornerRadius inválido dos MaterialButtons
+[33m0286a3f[m Redesign completo do aplicativo: paleta de cores moderna, layouts elegantes, cards com melhor hierarquia visual, botões maiores e mais legíveis
+[33m930f7ca[m Melhora BootReceiver para iniciar automaticamente; troca Gateway por MRIT Pulse; aumenta fonte do botão Continuar; melhora legibilidade dos textos na tela de detalhes
+[33m4d0103f[m Remove menções a Flask, Tuya e Python dos textos visíveis; aumenta fonte dos botões de salvar e testar conexão
+[33mb9f8e9e[m Melhora tela de detalhes do dispositivo: oculta ID completo (mostra últimos 5 chars), remove local key e tipo, aumenta fonte dos botões e textos
+[33mc4c5098[m Corrige BootReceiver: usa goAsync() e Thread para manter receiver vivo; adiciona logs detalhados e prioridade no intent-filter
+[33med810b1[m Melhora BootReceiver para funcionar mesmo com tela bloqueada; adiciona verificação de estado da tela e tratamento de erros
+[33m9d35d8d[m Adiciona inicialização automática no boot: servidor Python, mritserver e gelafitgo; adiciona suporte para versão do protocolo Tuya via JSON
+[33m0cfdba0[m Remover toggle, aumentar fontes, mudar cores para tema escuro e fixar rodapÃ© no final
+[33m26c477f[m Corrigir acesso a dicionÃ¡rio Python usando asMap() do Chaquopy
+[33m702d8f4[m Usar apenas protocolo 3.4, remover dispositivos falsos e usar scan real, corrigir campo de nome do site
+[33m32b6c0a[m Adicionar permissÃ£o FOREGROUND_SERVICE para o serviÃ§o Python
