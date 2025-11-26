@@ -9,7 +9,9 @@
     app:cardCornerRadius="16dp"
     app:cardElevation="2dp"
     app:strokeWidth="0dp"
-    app:cardBackgroundColor="@color/background_card">
+    app:cardBackgroundColor="@color/background_card"
+    app:strokeColor="@color/accent_neon"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -27,7 +29,7 @@
             <View
                 android:layout_width="3dp"
                 android:layout_height="24dp"
-                android:background="@color/accent_primary"
+                android:background="@color/accent_neon"
                 android:layout_marginEnd="12dp" />
 
             <TextView
@@ -35,20 +37,12 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Dispositivo"
+                android:text="***12345"
                 android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="@color/text_primary" />
+                android:textColor="@color/text_primary"
+                android:letterSpacing="0.05" />
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/deviceType"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tipo"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="6dp" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -58,17 +52,17 @@
 
             <View
                 android:id="@+id/statusIndicator"
-                android:layout_width="8dp"
-                android:layout_height="8dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
                 android:background="@drawable/status_indicator"
-                android:layout_marginEnd="6dp" />
+                android:layout_marginEnd="8dp" />
 
             <TextView
                 android:id="@+id/deviceStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Status"
-                android:textSize="14sp"
+                android:text="Online"
+                android:textSize="15sp"
                 android:textColor="@color/status_online"
                 android:textStyle="bold" />
         </LinearLayout>

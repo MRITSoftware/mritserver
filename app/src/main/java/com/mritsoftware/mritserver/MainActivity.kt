@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gatewayStatus: TextView
     private lateinit var deviceCount: TextView
     private lateinit var refreshButton: MaterialButton
+    private lateinit var serverStatusIndicator: android.widget.ImageView
     
     private val devices = mutableListOf<TuyaDevice>()
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
@@ -81,14 +82,18 @@ class MainActivity : AppCompatActivity() {
                 if (responseCode == 200) {
                     gatewayStatus.text = "Servidor rodando na porta 8000"
                     gatewayStatus.setTextColor(getColor(R.color.status_online))
+                    // Iniciar animação de pulso
+                    val pulseAnimation = android.view.animation.AnimationUtils.loadAnimation(this@MainActivity, R.anim.pulse_animation)
+                    serverStatusIndicator.startAnimation(pulseAnimation)
                 } else {
                     gatewayStatus.text = "Servidor iniciando..."
                     gatewayStatus.setTextColor(getColor(R.color.status_warning))
+                    serverStatusIndicator.clearAnimation()
                 }
             } catch (e: Exception) {
                 gatewayStatus.text = "Servidor iniciando..."
                 gatewayStatus.setTextColor(getColor(R.color.status_offline))
-                gatewayStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+                serverStatusIndicator.clearAnimation()
             }
         }
     }
@@ -130,6 +135,7 @@ class MainActivity : AppCompatActivity() {
         deviceCount = findViewById(R.id.deviceCount)
         refreshButton = findViewById(R.id.refreshButton)
         devicesRecyclerView = findViewById(R.id.devicesRecyclerView)
+        serverStatusIndicator = findViewById(R.id.serverStatusIndicator)
     }
     
     private fun setupRecyclerView() {

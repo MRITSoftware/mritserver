@@ -19,7 +19,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/background_secondary"
+            android:background="@color/background_card"
             android:elevation="2dp"
             app:title="@string/app_name"
             app:titleTextColor="@color/text_primary" />
@@ -58,12 +58,12 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="16dp">
+                        android:layout_marginBottom="20dp">
 
                         <View
                             android:layout_width="4dp"
                             android:layout_height="32dp"
-                            android:background="@color/accent_primary"
+                            android:background="@color/accent_neon"
                             android:layout_marginEnd="12dp" />
 
                         <TextView
@@ -76,15 +76,30 @@
                             android:textColor="@color/text_primary" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/gatewayStatus"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Conectado"
-                        android:textSize="18sp"
-                        android:textColor="@color/status_online"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="8dp" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <ImageView
+                            android:id="@+id/serverStatusIndicator"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/server_status_indicator"
+                            android:layout_marginEnd="12dp" />
+
+                        <TextView
+                            android:id="@+id/gatewayStatus"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Conectado"
+                            android:textSize="18sp"
+                            android:textColor="@color/status_online"
+                            android:textStyle="bold" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/deviceCount"
@@ -103,6 +118,7 @@
                 android:textSize="22sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary"
+                android:letterSpacing="0.02"
                 android:layout_marginBottom="16dp" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -121,7 +137,7 @@
                 android:textStyle="bold"
                 android:letterSpacing="0.02"
                 android:layout_marginTop="24dp"
-                android:backgroundTint="@color/accent_primary"
+                android:backgroundTint="@color/accent_neon"
                 style="@style/Widget.Material3.Button" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

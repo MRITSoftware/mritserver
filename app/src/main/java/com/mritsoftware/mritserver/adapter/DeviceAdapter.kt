@@ -17,7 +17,6 @@ class DeviceAdapter(
     class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val cardView: MaterialCardView = itemView.findViewById(R.id.deviceCard)
         val deviceName: TextView = itemView.findViewById(R.id.deviceName)
-        val deviceType: TextView = itemView.findViewById(R.id.deviceType)
         val deviceStatus: TextView = itemView.findViewById(R.id.deviceStatus)
     }
 
@@ -30,9 +29,15 @@ class DeviceAdapter(
     override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
         val device = devices[position]
         
-        // Mostrar apenas o ID do dispositivo
-        holder.deviceName.text = device.id
-        holder.deviceType.text = "Tipo: ${device.type.name}"
+        // Mostrar apenas os últimos 5 caracteres do ID
+        val deviceIdFull = device.id
+        val deviceIdMasked = if (deviceIdFull.length > 5) {
+            "***${deviceIdFull.takeLast(5)}"
+        } else {
+            deviceIdFull
+        }
+        holder.deviceName.text = deviceIdMasked
+        
         holder.deviceStatus.text = if (device.isOnline) "Online" else "Offline"
         val statusColor = if (device.isOnline) {
             holder.itemView.context.getColor(com.mritsoftware.mritserver.R.color.status_online)
@@ -44,16 +49,9 @@ class DeviceAdapter(
         // Atualizar indicador de status
         val statusIndicator = holder.itemView.findViewById<android.view.View>(com.mritsoftware.mritserver.R.id.statusIndicator)
         if (statusIndicator != null) {
-            val drawable = if (device.isOnline) {
-                android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(statusColor)
-                }
-            } else {
-                android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(statusColor)
-                }
+            val drawable = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(statusColor)
             }
             statusIndicator.background = drawable
         }

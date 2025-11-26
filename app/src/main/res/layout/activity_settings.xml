@@ -34,7 +34,7 @@
                 <View
                     android:layout_width="4dp"
                     android:layout_height="32dp"
-                    android:background="@color/accent_primary"
+                    android:background="@color/accent_neon"
                     android:layout_marginEnd="12dp" />
 
                 <TextView
@@ -90,7 +90,7 @@
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.02"
-                android:backgroundTint="@color/accent_primary"
+                android:backgroundTint="@color/accent_neon"
                 style="@style/Widget.Material3.Button" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

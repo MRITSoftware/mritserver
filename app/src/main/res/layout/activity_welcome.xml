@@ -101,7 +101,7 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.02"
-                    android:backgroundTint="@color/accent_primary"
+                    android:backgroundTint="@color/accent_neon"
                     style="@style/Widget.Material3.Button" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
