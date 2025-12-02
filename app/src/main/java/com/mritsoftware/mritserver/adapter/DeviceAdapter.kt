@@ -32,7 +32,9 @@ class DeviceAdapter(
         
         // Mostrar apenas o ID do dispositivo
         holder.deviceName.text = device.id
-        holder.deviceType.text = "Tipo: ${device.type.name}"
+        val versionLabel = device.protocolVersion?.takeIf { it.isNotBlank() }
+        holder.deviceType.text = versionLabel?.let { "Protocolo: $it" }
+            ?: "Tipo: ${device.type.name}"
         holder.deviceStatus.text = if (device.isOnline) "Online" else "Offline"
         holder.deviceStatus.setTextColor(
             if (device.isOnline) 0xFF4ECDC4.toInt() else 0xFFB0B0B0.toInt()

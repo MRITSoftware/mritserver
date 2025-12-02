@@ -231,6 +231,7 @@ class MainActivity : AppCompatActivity() {
                     
                     for ((deviceId, deviceInfo) in scanResult) {
                         val ip = deviceInfo["ip"] ?: ""
+                        val version = deviceInfo["version"] ?: ""
                         val savedName = prefs.getString("device_${deviceId}_name", null)
                         val name = savedName ?: "Dispositivo ${deviceId.take(8)}"
                         
@@ -241,7 +242,8 @@ class MainActivity : AppCompatActivity() {
                                 type = TuyaDevice.DeviceType.OTHER,
                                 isOnline = true,
                                 isOn = false,
-                                lanIp = ip
+                                lanIp = ip,
+                                protocolVersion = version
                             )
                         )
                     }

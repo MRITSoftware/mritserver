@@ -11,7 +11,9 @@ data class TuyaDevice(
     var isOnline: Boolean = false,
     var isOn: Boolean = false,
     var brightness: Int = 100,
-    var temperature: Int = 25
+    var temperature: Int = 25,
+    // Versão do protocolo Tuya (3.1, 3.2, 3.3, 3.4, etc), quando conhecida
+    var protocolVersion: String? = null
 ) : Serializable {
     enum class DeviceType {
         LIGHT,
